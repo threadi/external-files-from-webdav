@@ -1,0 +1,8 @@
+# Plugin-Slug
+plugin.slug=external-files-from-webdav
+
+# version number to use
+plugin.version=
+
+# set path to composer-binary
+composer.path=

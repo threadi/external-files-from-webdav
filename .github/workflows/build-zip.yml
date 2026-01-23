@@ -1,0 +1,88 @@
+name: Build release zip
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build release zip
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup WP-CLI
+        uses: godaddy-wordpress/setup-wp-cli@1
+
+      - name: Run package installs and builds
+        run: |
+          composer install
+          composer update
+          rm -fr build
+          rm -fr releases
+          rm -fr svn
+          rm .gitignore
+          rm .editorconfig
+          rm changelog.md
+          rm readme.md
+
+      - uses: anchore/sbom-action@v0
+
+      - name: Generate autoloader
+        run: composer dump-autoload -oa --no-dev
+
+      - name: Generate translation files
+        run: |
+          wp i18n make-php languages
+
+      - name: PHP Compatibility check
+        run: vendor/bin/phpcs -p app --standard=PHPCompatibilityWP
+
+      - name: Run WordPress Coding Standard fixes
+        run: vendor/bin/phpcbf --standard=ruleset.xml .
+
+      - name: Run WordPress Coding Standard checks
+        run: vendor/bin/phpcs --standard=ruleset.xml .
+
+      - name: Set version number 1
+        uses: richardrigutins/replace-in-files@v2
+        with:
+          files: 'external-files-from-webdav.php'
+          search-text: '@@VersionNumber@@'
+          replacement-text: ${{ github.ref_name }}
+
+      - name: Set version number 2
+        uses: richardrigutins/replace-in-files@v2
+        with:
+          files: 'readme.txt'
+          search-text: '@@VersionNumber@@'
+          replacement-text: ${{ github.ref_name }}
+
+      - name: Set version number 3
+        uses: richardrigutins/replace-in-files@v2
+        with:
+          files: 'uninstall.php'
+          search-text: '@@VersionNumber@@'
+          replacement-text: ${{ github.ref_name }}
+
+      - name: Create ZIP release
+        run: |
+          rm ruleset.xml
+          cd ..
+          zip -rq ${{ github.event.repository.name }}_${{ github.ref_name }}.zip ${{ github.event.repository.name }}/ -x "*/.git/*" "*/.github/*" "*/docs/*" "*/composer.lock" "*/ruleset.xml" "*/.gitignore" "*/vendor/*" "/.editorconfig" "*/phpstan.neon"
+          zip -urq ${{ github.event.repository.name }}_${{ github.ref_name }}.zip ${{ github.event.repository.name }}/vendor/autoload.php
+          zip -urq ${{ github.event.repository.name }}_${{ github.ref_name }}.zip ${{ github.event.repository.name }}/vendor/composer/*
+          zip -urq ${{ github.event.repository.name }}_${{ github.ref_name }}.zip ${{ github.event.repository.name }}/vendor/sabre/*
+          zip -urq ${{ github.event.repository.name }}_${{ github.ref_name }}.zip ${{ github.event.repository.name }}/vendor/afragen/*
+          cp ${{ github.event.repository.name }}_${{ github.ref_name }}.zip ${{ github.event.repository.name }}/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: ${{ github.event.repository.name }}_${{ github.ref_name }}.zip
