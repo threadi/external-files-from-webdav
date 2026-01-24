@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name:       External files from Google Drive in Media Library
- * Description:       Extends External files in Media Library for usage of Google Drive.
+ * Plugin Name:       External files from WebDav in Media Library
+ * Description:       Extends External files in Media Library for usage of WebDav.
  * Requires at least: 6.2
  * Requires PHP:      8.1
  * Requires Plugins:  external-files-in-media-library
