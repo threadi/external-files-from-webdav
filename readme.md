@@ -4,9 +4,10 @@
 
 This repository provides the features of the WordPress plugin _External Files from WebDav in Media Library_. The repository is used as a basis for deploying the plugin to the WordPress repository. It is not intended to run as a plugin as it is, even if that is possible for development.
 
-## Hint
+## Hints
 
-You will need the plugin _External Files in Media Library_ to run this plugin.
+* You will need the plugin _External Files in Media Library_ to run this plugin.
+* This plugin adds the official library "sabre/dav", that is using the BSD-2 License. This is not kompatible with the GPL License the WordPress Repository requires.
 
 ## Usage
 
