@@ -11,6 +11,7 @@ namespace ExternalFilesFromWebDav\Plugin;
 defined( 'ABSPATH' ) || exit;
 
 use ExternalFilesInMediaLibrary\Plugin\Roles;
+use ExternalFilesInMediaLibrary\Services\Service_Plugin_Base;
 use ExternalFilesInMediaLibrary\Services\WebDav;
 
 /**
@@ -64,6 +65,7 @@ class Init {
 
 		// add the service.
 		add_filter( 'efml_services_support', array( $this, 'add_service' ) );
+		add_filter( 'efml_service_plugins', array( $this, 'remove_service_plugin' ) );
 
 		// misc.
 		add_action( 'init', array( $this, 'init_languages' ) );
@@ -99,5 +101,52 @@ class Init {
 	public function activation(): void {
 		// set the capabilities for this new service.
 		Roles::get_instance()->set( array( 'administrator', 'editor' ), 'efml_cap_' . WebDav::get_instance()->get_name() );
+	}
+
+	/**
+	 * Remove the service plugin from the main plugin.
+	 *
+	 * @param array<string,Service_Plugin_Base> $plugins List of plugins.
+	 * @return array<string,Service_Plugin_Base>
+	 */
+	public function remove_service_plugin( array $plugins ): array {
+		unset( $plugins['external-files-from-webdav'] );
+		return $plugins;
+	}
+
+	/**
+	 * Check if External files in media library is active:
+	 * 1. in the actual blog.
+	 * 2. in the global network, if multisite is used.
+	 *
+	 * @return bool
+	 */
+	public function is_parent_plugin_active(): bool {
+		// set the slug.
+		$slug = 'external-files-in-media-library/external-files-in-media-library.php';
+
+		// check the actual blog.
+		$is_active = in_array( $slug, (array) get_option( 'active_plugins', array() ), true );
+
+		// bail if result is true.
+		if( $is_active ) {
+			return true;
+		}
+
+		// bail if we are not in multisite.
+		if( ! is_multisite() ) {
+			return false;
+		}
+
+		// get sitewide plugins.
+		$sitewide_plugins = get_site_option( 'active_sitewide_plugins' );
+
+		// bail if not list could be loaded.
+		if( ! is_array( $sitewide_plugins ) ) {
+			return false;
+		}
+
+		// return the result.
+		return isset( $sitewide_plugins[$slug] );
 	}
 }
