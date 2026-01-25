@@ -97,7 +97,7 @@ class Export extends Export_Base {
 		 * @param string $domain The domain to use.
 		 * @param string $directory The requested URL.
 		 */
-		$settings = apply_filters( 'efml_service_webdav_settings', $settings, $domain, $directory );
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
@@ -137,7 +137,7 @@ class Export extends Export_Base {
 		 * @since 5.0.0 Available since 5.0.0.
 		 * @param array<int,int> $status_codes List of allowed status codes.
 		 */
-		if ( ! in_array( absint( $result['statusCode'] ), apply_filters( 'efml_service_webdav_status_codes', $status_codes ), true ) ) {
+		if ( ! in_array( absint( $result['statusCode'] ), apply_filters( 'efmlwd_service_webdav_status_codes', $status_codes ), true ) ) {
 			// log this event.
 			Log::get_instance()->create( __( 'Got unsupported status code from WebDav during export of a file:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $result ) . '</code>', $target, 'error' );
 
@@ -195,7 +195,7 @@ class Export extends Export_Base {
 		 * @param string               $domain    The domain to use.
 		 * @param string               $directory The requested URL.
 		 */
-		$settings = apply_filters( 'efml_service_webdav_settings', $settings, $domain, $directory );
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
@@ -220,7 +220,7 @@ class Export extends Export_Base {
 		 *
 		 * @param array<int,int> $status_codes List of allowed status codes.
 		 */
-		if ( ! in_array( absint( $result['statusCode'] ), apply_filters( 'efml_service_webdav_status_codes', $status_codes ), true ) ) {
+		if ( ! in_array( absint( $result['statusCode'] ), apply_filters( 'efmlwd_service_webdav_status_codes', $status_codes ), true ) ) {
 			// log this event.
 			Log::get_instance()->create( __( 'Got unsupported status code from WebDav during deletion of a file:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $result ) . '</code>', $url, 'error' );
 

@@ -134,7 +134,7 @@ class Protocol extends Protocol_Base {
 		 * @param string $domain The domain to use.
 		 * @param string $directory The requested URL.
 		 */
-		$path = apply_filters( 'efml_service_webdav_path', $path, $fields, $domain, $directory );
+		$path = apply_filters( 'efmlwd_service_webdav_path', $path, $fields, $domain, $directory );
 
 		// create settings array for request.
 		$settings = array(
@@ -152,7 +152,10 @@ class Protocol extends Protocol_Base {
 		 * @param string $domain The domain to use.
 		 * @param string $directory The requested URL.
 		 */
-		$settings = apply_filters( 'efml_service_webdav_settings', $settings, $domain, $directory );
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
+
+		// get WP Filesystem-handler.
+		$wp_filesystem = Helper::get_wp_filesystem();
 
 		// get a new client.
 		$client = WebDav::get_instance()->get_client( $settings, $domain, $directory );
@@ -191,7 +194,7 @@ class Protocol extends Protocol_Base {
 			 * @param string $url   The URL to import.
 			 * @param array<string> $directory_list List of matches (the URLs).
 			 */
-			do_action( 'efml_webdav_directory_import_files', $url, $directory_list );
+			do_action( 'efmlwd_directory_import_files', $url, $directory_list );
 
 			// loop through the results and add each to the response.
 			foreach ( $directory_list as $file_name => $setting ) {
@@ -202,7 +205,7 @@ class Protocol extends Protocol_Base {
 				 *
 				 * @param string $file_url   The URL to import.
 				 */
-				do_action( 'efml_webdav_directory_import_file_check', $domain . $file_name );
+				do_action( 'efmlwd_directory_import_file_check', $domain . $file_name );
 
 				// bail if resource type is not null.
 				if ( ! is_null( $setting['{DAV:}resourcetype'] ) ) {
@@ -229,9 +232,6 @@ class Protocol extends Protocol_Base {
 				// set the file as tmp-file for import.
 				$results['tmp-file'] = wp_tempnam();
 
-				// get WP Filesystem-handler.
-				$wp_filesystem = Helper::get_wp_filesystem();
-
 				// set settings for new sabre-client object.
 				$settings = array(
 					'baseUri'  => $domain . $file_name,
@@ -248,7 +248,7 @@ class Protocol extends Protocol_Base {
 				// save the content.
 				$wp_filesystem->put_contents( $results['tmp-file'], $file_data['body'] );
 
-				// add file to the list.
+				// add the file to the list.
 				$listing[] = $results;
 			}
 
