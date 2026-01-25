@@ -10,6 +10,7 @@ namespace ExternalFilesFromWebDav;
 // prevent direct access.
 defined( 'ABSPATH' ) || exit;
 
+use ExternalFilesFromWebDav\WebDav\Export;
 use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\Checkbox;
 use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\Password;
 use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\Text;
@@ -27,7 +28,6 @@ use ExternalFilesInMediaLibrary\Plugin\Helper;
 use ExternalFilesInMediaLibrary\Plugin\Log;
 use ExternalFilesInMediaLibrary\Services\Service;
 use ExternalFilesInMediaLibrary\Services\Service_Base;
-use ExternalFilesInMediaLibrary\Services\WebDav\Export;
 use Sabre\DAV\Client;
 use Error;
 use WP_Error;
@@ -119,9 +119,9 @@ class WebDav extends Service_Base implements Service {
 
 		// use our own hooks.
 		add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
-		add_filter( 'efml_service_webdav_hide_file', array( $this, 'prevent_not_allowed_files' ), 10, 3 );
-		add_filter( 'efml_service_webdav_client', array( $this, 'ignore_self_signed_ssl' ) );
-		add_filter( 'efml_service_webdav_path', array( $this, 'set_path' ), 10, 2 );
+		add_filter( 'efmlwd_service_webdav_hide_file', array( $this, 'prevent_not_allowed_files' ), 10, 3 );
+		add_filter( 'efmlwd_service_webdav_client', array( $this, 'ignore_self_signed_ssl' ) );
+		add_filter( 'efmlwd_service_webdav_path', array( $this, 'set_path' ), 10, 2 );
 		add_action( 'efml_export_before_on_service', array( $this, 'enable_unsafe_urls_for_export' ) );
 		add_action( 'efml_proxy_before', array( $this, 'enable_unsafe_urls_for_proxy' ) );
 
@@ -345,7 +345,7 @@ class WebDav extends Service_Base implements Service {
 		 * @param string $domain The domain to use.
 		 * @param string $directory The requested URL.
 		 */
-		$path = apply_filters( 'efml_service_webdav_path', $path, $fields, $domain, $directory );
+		$path = apply_filters( 'efmlwd_service_webdav_path', $path, $fields, $domain, $directory );
 
 		/**
 		 * Filter the WebDAV settings.
@@ -356,7 +356,7 @@ class WebDav extends Service_Base implements Service {
 		 * @param string $domain The domain to use.
 		 * @param string $directory The requested URL.
 		 */
-		$settings = apply_filters( 'efml_service_webdav_settings', $settings, $domain, $directory );
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
 		// get a new client.
 		$client = $this->get_client( $settings, $domain, $directory );
@@ -408,7 +408,7 @@ class WebDav extends Service_Base implements Service {
 				 *
 				 * @noinspection PhpConditionAlreadyCheckedInspection
 				 */
-				if ( apply_filters( 'efml_service_webdav_hide_file', $false, $settings, $file_name ) ) {
+				if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $settings, $file_name ) ) {
 					continue;
 				}
 
@@ -630,7 +630,7 @@ class WebDav extends Service_Base implements Service {
 		 * @param string $domain    The domain to use.
 		 * @param string $directory The requested URL.
 		 */
-		return apply_filters( 'efml_service_webdav_client', $client, $domain, $directory );
+		return apply_filters( 'efmlwd_service_webdav_client', $client, $domain, $directory );
 	}
 
 	/**
@@ -722,7 +722,7 @@ class WebDav extends Service_Base implements Service {
 		 * @since 5.0.0 Available since 5.0.0.
 		 * @param array<string,mixed> $list The list of settings.
 		 */
-		return apply_filters( 'efml_service_webdav_user_settings', $list );
+		return apply_filters( 'efmlwd_service_webdav_user_settings', $list );
 	}
 
 	/**
