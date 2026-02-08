@@ -969,4 +969,13 @@ class WebDav extends Service_Base implements Service {
 		// set filter to enabled unsafe URL.
 		add_filter( 'http_request_args', array( $this, 'disable_check_for_unsafe_urls' ) );
 	}
+
+	/**
+	 * Return the default roles to use for this service.
+	 *
+	 * @return array<int,string>
+	 */
+	public function get_default_roles(): array {
+		return array( 'administrator', 'editor' );
+	}
 }
