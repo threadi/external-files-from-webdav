@@ -10,9 +10,9 @@ namespace ExternalFilesFromWebDav\Plugin;
 // prevent direct access.
 defined( 'ABSPATH' ) || exit;
 
+use ExternalFilesFromWebDav\WebDav;
 use ExternalFilesInMediaLibrary\Plugin\Roles;
 use ExternalFilesInMediaLibrary\Services\Service_Plugin_Base;
-use ExternalFilesInMediaLibrary\Services\WebDav;
 
 /**
  * Initialize the plugin, connect all together.

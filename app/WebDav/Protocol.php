@@ -12,12 +12,14 @@ defined( 'ABSPATH' ) || exit;
 
 use ExternalFilesFromWebDav\WebDav;
 use ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base;
+use ExternalFilesInMediaLibrary\ExternalFiles\Protocols\Http;
 use ExternalFilesInMediaLibrary\ExternalFiles\Results;
 use ExternalFilesInMediaLibrary\ExternalFiles\Results\Url_Result;
 use ExternalFilesInMediaLibrary\Plugin\Helper;
 use ExternalFilesInMediaLibrary\Plugin\Log;
 use Sabre\HTTP\ClientHttpException;
 use Error;
+use WP_Filesystem_Base;
 
 /**
  * Object to handle different protocols.
@@ -127,7 +129,7 @@ class Protocol extends Protocol_Base {
 		/**
 		 * Filter the WebDAV path.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param string $path The path to use after the given domain.
 		 * @param array $fields The login to use.
@@ -146,7 +148,7 @@ class Protocol extends Protocol_Base {
 		/**
 		 * Filter the WebDAV settings.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param array<string,string> $settings The settings to use.
 		 * @param string $domain The domain to use.
@@ -165,7 +167,7 @@ class Protocol extends Protocol_Base {
 			// get the object by direct request.
 			$directory_list = $client->propFind( '', array(), 1 );
 
-			// bail if returned array contains only 1 entry and index with path does not exist.
+			// bail if returned array contains only 1 entry and index for the path does not exist.
 			if ( 1 === count( $directory_list ) && empty( $directory_list[ $path ] ) ) {
 				// create the error entry.
 				$error_obj = new Url_Result();
@@ -189,7 +191,7 @@ class Protocol extends Protocol_Base {
 			/**
 			 * Run action if we have files to check via WebDav-protocol.
 			 *
-			 * @since 5.0.0 Available since 5.0.0.
+			 * @since 1.0.0 Available since 1.0.0.
 			 *
 			 * @param string $url   The URL to import.
 			 * @param array<string> $directory_list List of matches (the URLs).
@@ -201,7 +203,7 @@ class Protocol extends Protocol_Base {
 				/**
 				 * Run action just before the file check via WebDAV-protocol.
 				 *
-				 * @since 5.0.0 Available since 5.0.0.
+				 * @since 1.0.0 Available since 1.0.0.
 				 *
 				 * @param string $file_url   The URL to import.
 				 */
@@ -274,6 +276,118 @@ class Protocol extends Protocol_Base {
 	}
 
 	/**
+	 * Return infos about single given URL.
+	 *
+	 * @param string $url The URL to check.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function get_url_info( string $url ): array {
+		$directory = $url;
+
+		// get the staring directory.
+		$parse_url = wp_parse_url( $url );
+
+		// bail if scheme or host is not found in directory URL.
+		if ( ! isset( $parse_url['scheme'], $parse_url['host'] ) ) {
+			// create the error entry.
+			$error_obj = new Url_Result();
+			$error_obj->set_result_text( __( 'Got faulty URL.', 'external-files-from-webdav' ) );
+			$error_obj->set_url( $url );
+			$error_obj->set_error( true );
+
+			// add the error object to the list of errors.
+			Results::get_instance()->add( $error_obj );
+
+			// do nothing more.
+			return array();
+		}
+
+		// set the requested domain.
+		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+
+		// get the path.
+		$path = isset( $parse_url['path'] ) ? $parse_url['path'] : '';
+
+		$fields = $this->get_fields();
+		/**
+		 * Filter the WebDAV path.
+		 *
+		 * @since 1.0.0 Available since 1.0.0.
+		 *
+		 * @param string $path The path to use after the given domain.
+		 * @param array $fields The login to use.
+		 * @param string $domain The domain to use.
+		 * @param string $directory The requested URL.
+		 */
+		$path = apply_filters( 'efmlwd_service_webdav_path', $path, $fields, $domain, $directory );
+
+		// create settings array for request.
+		$settings = array(
+			'baseUri'  => $domain . $path,
+			'userName' => $fields['login']['value'],
+			'password' => $fields['password']['value'],
+		);
+
+		/**
+		 * Filter the WebDAV settings.
+		 *
+		 * @since 1.0.0 Available since 1.0.0.
+		 *
+		 * @param array<string,string> $settings The settings to use.
+		 * @param string $domain The domain to use.
+		 * @param string $directory The requested URL.
+		 */
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
+
+		// get WP Filesystem-handler.
+		$wp_filesystem = Helper::get_wp_filesystem();
+
+		// get a new client.
+		$client = WebDav::get_instance()->get_client( $settings, $domain, $directory );
+
+		// get the object by direct request.
+		$file_data = $client->propFind( $path, array() );
+
+		// bail if we got an empty response.
+		if( empty( $file_data ) ) {
+			// create the error entry.
+			$error_obj = new Url_Result();
+			$error_obj->set_result_text( __( 'Got empty response from WebDAV for given file.', 'external-files-from-webdav' ) );
+			$error_obj->set_url( $this->get_url() );
+			$error_obj->set_error( true );
+
+			// add the error object to the list of errors.
+			Results::get_instance()->add( $error_obj );
+
+			// do nothing more.
+			return array();
+		}
+
+		// initialize the file infos array.
+		$results = array(
+			'title'         => basename( $path ),
+			'filesize'      => $file_data['{DAV:}getcontentlength'],
+			'mime-type'     => $file_data['{DAV:}getcontenttype'],
+			'local'         => true,
+			'url'           => $url,
+			'last-modified' => $file_data['{DAV:}getlastmodified'],
+		);
+
+		// get WP Filesystem-handler.
+		$wp_filesystem = Helper::get_wp_filesystem();
+
+		// get the tmp file.
+		$tmp_file = $this->get_temp_file( $url, $wp_filesystem );
+		if( is_string( $tmp_file ) ) {
+			$results['tmp-file'] = $tmp_file;
+		}
+
+		// return the resulting data for the file.
+		return $results;
+	}
+
+	/**
 	 * Return whether the file should be saved local (true) or not (false).
 	 *
 	 * @return bool
@@ -307,5 +421,22 @@ class Protocol extends Protocol_Base {
 	 */
 	public function can_check_availability(): bool {
 		return false;
+	}
+
+	/**
+	 * Return temp file from given URL.
+	 *
+	 * @param string             $url The given URL.
+	 * @param WP_Filesystem_Base $filesystem The file system handler.
+	 *
+	 * @return bool|string
+	 */
+	public function get_temp_file( string $url, WP_Filesystem_Base $filesystem ): bool|string {
+		// get the HTTP protocol handler.
+		$http_protocol_handler = new Http( $url );
+		$http_protocol_handler->set_fields( $this->get_fields() );
+
+		// return the results from the HTTP handler.
+		return $http_protocol_handler->get_temp_file( $url, $filesystem );
 	}
 }

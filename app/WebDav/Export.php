@@ -91,7 +91,7 @@ class Export extends Export_Base {
 		/**
 		 * Filter the WebDAV settings.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param array<string,string> $settings The settings to use.
 		 * @param string $domain The domain to use.
@@ -114,7 +114,7 @@ class Export extends Export_Base {
 			return false;
 		}
 
-		// get the local WP_Filesystem.
+		// get the local "WP_Filesystem".
 		$wp_filesystem_local = Helper::get_wp_filesystem();
 
 		// bail if source file does not exist.
@@ -126,15 +126,18 @@ class Export extends Export_Base {
 			return false;
 		}
 
-		// upload the file.
-		$result = $client->request( 'PUT', $target, (string) $wp_filesystem_local->get_contents( $file_path ) );
+		// set the upload path we will use for this file.
+		$upload_path = $credentials['fields']['path']['value'] . $credentials['fields']['login']['value'] . $parse_url['path'];
+
+		// upload the file to the given path.
+		$result = $client->request( 'PUT', $upload_path, (string) $wp_filesystem_local->get_contents( $file_path ) );
 
 		// list of allowed status codes.
 		$status_codes = array( 201, 204 );
 		/**
 		 * Filter the statusCode after exporting a file to WebDav.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 * @param array<int,int> $status_codes List of allowed status codes.
 		 */
 		if ( ! in_array( absint( $result['statusCode'] ), apply_filters( 'efmlwd_service_webdav_status_codes', $status_codes ), true ) ) {
@@ -146,7 +149,7 @@ class Export extends Export_Base {
 		}
 
 		// return the given target URL.
-		return $target;
+		return $domain . $upload_path;
 	}
 
 	/**
@@ -189,7 +192,7 @@ class Export extends Export_Base {
 		/**
 		 * Filter the WebDAV settings.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param array<string,string> $settings  The settings to use.
 		 * @param string               $domain    The domain to use.
@@ -197,15 +200,18 @@ class Export extends Export_Base {
 		 */
 		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
+		// set the upload path we will use for this file.
+		$upload_path = $credentials['fields']['path']['value'] . $credentials['fields']['login']['value'] . $parse_url['path'];
+
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
 
 		// delete the file.
 		try {
-			$result = $client->request( 'DELETE', $url );
+			$result = $client->request( 'DELETE', $upload_path );
 		} catch ( Exception $e ) {
 			// log this event.
-			Log::get_instance()->create( __( 'Error occurred during request to delete a file on WebDav:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $url, 'error' );
+			Log::get_instance()->create( __( 'Error occurred during request to delete a file on WebDav:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $upload_path, 'error' );
 
 			// return empty array to not load anything more.
 			return false;
@@ -216,13 +222,13 @@ class Export extends Export_Base {
 		/**
 		 * Filter the statusCode after exporting a file to WebDav.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param array<int,int> $status_codes List of allowed status codes.
 		 */
 		if ( ! in_array( absint( $result['statusCode'] ), apply_filters( 'efmlwd_service_webdav_status_codes', $status_codes ), true ) ) {
 			// log this event.
-			Log::get_instance()->create( __( 'Got unsupported status code from WebDav during deletion of a file:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $result ) . '</code>', $url, 'error' );
+			Log::get_instance()->create( __( 'Got unsupported status code from WebDav during deletion of a file:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $result ) . '</code>', $upload_path, 'error' );
 
 			// do nothing more.
 			return false;
