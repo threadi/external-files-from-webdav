@@ -350,7 +350,7 @@ class Protocol extends Protocol_Base {
 		$file_data = $client->propFind( $path, array() );
 
 		// bail if we got an empty response.
-		if( empty( $file_data ) ) {
+		if ( empty( $file_data ) ) {
 			// create the error entry.
 			$error_obj = new Url_Result();
 			$error_obj->set_result_text( __( 'Got empty response from WebDAV for given file.', 'external-files-from-webdav' ) );
@@ -379,7 +379,7 @@ class Protocol extends Protocol_Base {
 
 		// get the tmp file.
 		$tmp_file = $this->get_temp_file( $url, $wp_filesystem );
-		if( is_string( $tmp_file ) ) {
+		if ( is_string( $tmp_file ) ) {
 			$results['tmp-file'] = $tmp_file;
 		}
 
