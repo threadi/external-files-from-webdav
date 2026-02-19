@@ -255,7 +255,7 @@ class WebDav extends Service_Base implements Service {
 	 */
 	public function add_protocol( array $protocols ): array {
 		// add the WebDAV protocol before the HTTPS-protocol and return resulting list of protocols.
-		array_unshift( $protocols, 'ExternalFilesInMediaLibrary\Services\WebDav\Protocol' );
+		array_unshift( $protocols, 'ExternalFilesFromWebDav\WebDav\Protocol' );
 
 		// return the resulting list.
 		return $protocols;
