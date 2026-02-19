@@ -110,7 +110,7 @@ class WebDav extends Service_Base implements Service {
 		add_action( 'init', array( $this, 'init_webdav' ), 30 );
 
 		// bail if user has no capability for this service.
-		if ( ! current_user_can( 'efml_cap_' . $this->get_name() ) ) {
+		if ( ! Helper::is_cli() && ! current_user_can( 'efml_cap_' . $this->get_name() ) ) {
 			return;
 		}
 
@@ -338,7 +338,7 @@ class WebDav extends Service_Base implements Service {
 		/**
 		 * Filter the WebDAV path.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param string $path The path to use after the given domain.
 		 * @param array $fields The fields to use.
@@ -350,7 +350,7 @@ class WebDav extends Service_Base implements Service {
 		/**
 		 * Filter the WebDAV settings.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param array<string,string> $settings The settings to use.
 		 * @param string $domain The domain to use.
@@ -400,7 +400,7 @@ class WebDav extends Service_Base implements Service {
 				/**
 				 * Filter whether given WebDAV file should be hidden.
 				 *
-				 * @since 5.0.0 Available since 5.0.0.
+				 * @since 1.0.0 Available since 1.0.0.
 				 *
 				 * @param bool $false True if it should be hidden.
 				 * @param array<string,mixed> $file The array with the file data.
@@ -624,7 +624,7 @@ class WebDav extends Service_Base implements Service {
 		 *
 		 * E.g., to add proxy or other additional settings to reach the WebDAV.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 *
 		 * @param Client $client The WebDAV client object.
 		 * @param string $domain    The domain to use.
@@ -719,7 +719,7 @@ class WebDav extends Service_Base implements Service {
 		/**
 		 * Filter the list of possible user settings for WebDAV.
 		 *
-		 * @since 5.0.0 Available since 5.0.0.
+		 * @since 1.0.0 Available since 1.0.0.
 		 * @param array<string,mixed> $list The list of settings.
 		 */
 		return apply_filters( 'efmlwd_service_webdav_user_settings', $list );

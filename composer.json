@@ -39,7 +39,6 @@
     },
     "require": {
         "php": "^8.1",
-        "sabre/dav": "^4.7",
-        "afragen/git-updater-lite": "^2"
+        "sabre/dav": "^4.7"
     }
 }
