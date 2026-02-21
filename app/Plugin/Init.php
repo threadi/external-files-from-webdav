@@ -70,6 +70,7 @@ class Init {
 
 		// misc.
 		add_action( 'init', array( $this, 'init_languages' ) );
+		add_filter( 'wp_consent_api_registered_' . plugin_basename( EFMLWD_PLUGIN ), array( $this, 'register_consent_api' ) );
 	}
 
 	/**
@@ -164,5 +165,15 @@ class Init {
 
 		// return the resulting configurations.
 		return $configurations;
+	}
+
+	/**
+	 * We simply return true to register the plugin with WP Consent API, although we do not use it
+	 * as this plugin does not set any cookies or collect any personal data.
+	 *
+	 * @return bool
+	 */
+	public function register_consent_api(): bool {
+		return true;
 	}
 }
