@@ -140,6 +140,11 @@ class WebDav extends Service_Base implements Service {
 			return;
 		}
 
+		// bail if settings object is missing.
+		if( ! class_exists( '\easySettingsForWordPress\Settings' ) ) {
+			return;
+		}
+
 		// get the settings object.
 		$settings_obj = Settings::get_instance()->get_settings_obj();
 
