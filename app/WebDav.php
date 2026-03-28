@@ -10,15 +10,14 @@ namespace ExternalFilesFromWebDav;
 // prevent direct access.
 defined( 'ABSPATH' ) || exit;
 
+use easySettingsForWordPress\Fields\Checkbox;
+use easySettingsForWordPress\Fields\Password;
+use easySettingsForWordPress\Fields\Text;
+use easySettingsForWordPress\Fields\TextInfo;
+use easySettingsForWordPress\Page;
+use easySettingsForWordPress\Section;
+use easySettingsForWordPress\Tab;
 use ExternalFilesFromWebDav\WebDav\Export;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\Checkbox;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\Password;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\Text;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Fields\TextInfo;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Page;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Section;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Settings;
-use ExternalFilesInMediaLibrary\Dependencies\easySettingsForWordPress\Tab;
 use ExternalFilesInMediaLibrary\ExternalFiles\Export_Base;
 use ExternalFilesInMediaLibrary\ExternalFiles\File;
 use ExternalFilesInMediaLibrary\ExternalFiles\ImportDialog;
@@ -26,6 +25,7 @@ use ExternalFilesInMediaLibrary\ExternalFiles\Protocols;
 use easyDirectoryListingForWordPress\Crypt;
 use ExternalFilesInMediaLibrary\Plugin\Helper;
 use ExternalFilesInMediaLibrary\Plugin\Log;
+use ExternalFilesInMediaLibrary\Plugin\Settings;
 use ExternalFilesInMediaLibrary\Services\Service;
 use ExternalFilesInMediaLibrary\Services\Service_Base;
 use Sabre\DAV\Client;
@@ -140,8 +140,13 @@ class WebDav extends Service_Base implements Service {
 			return;
 		}
 
+		// bail if settings object is missing.
+		if( ! class_exists( '\easySettingsForWordPress\Settings' ) ) {
+			return;
+		}
+
 		// get the settings object.
-		$settings_obj = Settings::get_instance();
+		$settings_obj = Settings::get_instance()->get_settings_obj();
 
 		// get the settings page.
 		$settings_page = $settings_obj->get_page( \ExternalFilesInMediaLibrary\Plugin\Settings::get_instance()->get_menu_slug() );
@@ -182,7 +187,7 @@ class WebDav extends Service_Base implements Service {
 			$setting->set_section( $section );
 			$setting->set_autoload( false );
 			$setting->set_type( 'string' );
-			$field = new Text();
+			$field = new Text( $settings_obj );
 			$field->set_title( __( 'WebDAV Server', 'external-files-from-webdav' ) );
 			$field->set_placeholder( __( 'https://nextcloud.local', 'external-files-from-webdav' ) );
 			$setting->set_field( $field );
@@ -194,7 +199,7 @@ class WebDav extends Service_Base implements Service {
 			$setting->set_type( 'string' );
 			$setting->set_read_callback( array( $this, 'decrypt_value' ) );
 			$setting->set_save_callback( array( $this, 'encrypt_value' ) );
-			$field = new Text();
+			$field = new Text( $settings_obj );
 			$field->set_title( __( 'Login', 'external-files-from-webdav' ) );
 			$field->set_placeholder( __( 'Your login', 'external-files-from-webdav' ) );
 			$setting->set_field( $field );
@@ -206,7 +211,7 @@ class WebDav extends Service_Base implements Service {
 			$setting->set_type( 'string' );
 			$setting->set_read_callback( array( $this, 'decrypt_value' ) );
 			$setting->set_save_callback( array( $this, 'encrypt_value' ) );
-			$field = new Password();
+			$field = new Password( $settings_obj );
 			$field->set_title( __( 'Password', 'external-files-from-webdav' ) );
 			$field->set_placeholder( __( 'Your password', 'external-files-from-webdav' ) );
 			$setting->set_field( $field );
@@ -216,7 +221,7 @@ class WebDav extends Service_Base implements Service {
 			$setting->set_section( $section );
 			$setting->set_type( 'string' );
 			$setting->set_default( '/remote.php/dav/files/' );
-			$field = new Text();
+			$field = new Text( $settings_obj );
 			$field->set_title( __( 'Path', 'external-files-from-webdav' ) );
 			$field->set_description( __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ) );
 			$setting->set_field( $field );
@@ -228,7 +233,7 @@ class WebDav extends Service_Base implements Service {
 			$setting->set_section( $section );
 			$setting->set_show_in_rest( false );
 			$setting->prevent_export( true );
-			$field = new TextInfo();
+			$field = new TextInfo( $settings_obj );
 			$field->set_title( __( 'Hint', 'external-files-from-webdav' ) );
 			/* translators: %1$s will be replaced by a URL. */
 			$field->set_description( sprintf( __( 'Each user will find its settings in his own <a href="%1$s">user profile</a>.', 'external-files-from-webdav' ), $this->get_config_url() ) );
@@ -240,7 +245,7 @@ class WebDav extends Service_Base implements Service {
 		$setting->set_section( $section );
 		$setting->set_type( 'integer' );
 		$setting->set_default( 0 );
-		$field = new Checkbox();
+		$field = new Checkbox( $settings_obj );
 		$field->set_title( __( 'Ignore self-signed SSL-certificates', 'external-files-from-webdav' ) );
 		$field->set_description( __( 'If enabled self-signed certificates will be acknowledged.', 'external-files-from-webdav' ) );
 		$setting->set_field( $field );
