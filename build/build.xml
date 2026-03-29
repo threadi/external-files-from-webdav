@@ -99,11 +99,21 @@
         </exec>
     </target>
 
+    <!-- generate php-translations -->
+    <target name="php-translations">
+        <delete>
+            <fileset dir="${src.dir}/languages/" includes="**/*.php"/>
+        </delete>
+        <exec dir="${src.dir}" failonerror="true" executable="wp">
+            <arg line="i18n make-php languages"/>
+        </exec>
+    </target>
+
     <!-- init project -->
     <target name="init" description="Initialize the project" depends="composer-install,autoloader-generation-dev" />
 
     <!-- create release-zip -->
-    <target name="build" description="Builds a new release" depends="init,generate-documentation,autoloader-generation,check-phpstan,check-php-compatibility,check-wcs,setVersionNumber">
+    <target name="build" description="Builds a new release" depends="init,generate-documentation,autoloader-generation,php-translations,check-phpstan,check-php-compatibility,check-wcs,setVersionNumber">
         <delete file="${build.dir}/${plugin.slug}_${plugin.version}.zip"/>
         <zip destfile="${build.dir}/${plugin.slug}_${plugin.version}.zip">
             <zipfileset dir="${src.dir}/app" prefix="${plugin.slug}/app" />
@@ -112,10 +122,9 @@
             <zipfileset dir="${src.dir}/vendor" includes="autoload.php" fullpath="${plugin.slug}/vendor/autoload.php" />
             <zipfileset dir="${src.dir}/vendor/composer" prefix="${plugin.slug}/vendor/composer" />
             <zipfileset dir="${src.dir}/vendor/sabre" prefix="${plugin.slug}/vendor/sabre" />
-            <zipfileset dir="${src.dir}/vendor/afragen" prefix="${plugin.slug}/vendor/afragen" />
             <zipfileset dir="${src.dir}" includes="readme-release.txt" fullpath="${plugin.slug}/readme.txt" />
             <zipfileset dir="${src.dir}" includes="uninstall-release.php" fullpath="${plugin.slug}/uninstall.php" />
-            <zipfileset dir="${src.dir}" includes="uninstall.php,composer.json" prefix="${plugin.slug}" />
+            <zipfileset dir="${src.dir}" includes="composer.json" prefix="${plugin.slug}" />
             <zipfileset dir="${src.dir}" includes="${plugin.slug}-release.php" fullpath="${plugin.slug}/${plugin.slug}.php" />
         </zip>
         <antcall target="autoloader-generation-dev" />

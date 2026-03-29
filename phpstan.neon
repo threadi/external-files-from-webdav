@@ -5,6 +5,7 @@ parameters:
     - "#^Unsafe usage of new static#"
     - "#of function absint expects#"
     - "#ExternalFilesInMediaLibrary#"
+    - "#easySettingsForWordPress#"
     - "#set_fields#"
     - "#add_error#"
     - "#get_name#"
