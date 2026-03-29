@@ -2,7 +2,7 @@
 /**
  * File to handle a configuration preset to use only AWS S3.
  *
- * @package external-files-in-media-library
+ * @package external-files-from-webdav
  */
 
 namespace ExternalFilesFromWebDav\Plugin;
@@ -10,7 +10,6 @@ namespace ExternalFilesFromWebDav\Plugin;
 // prevent direct access.
 defined( 'ABSPATH' ) || exit;
 
-use ExternalFilesFromAwsS3\AwsS3;
 use ExternalFilesFromWebDav\WebDav;
 use ExternalFilesInMediaLibrary\Plugin\Configuration_Base;
 use ExternalFilesInMediaLibrary\Services\Services;
@@ -38,7 +37,7 @@ class Configuration extends Configuration_Base {
 	 * @return string
 	 */
 	public function get_title(): string {
-		return __( 'Use only WebDav', 'external-files-in-media-library' );
+		return __( 'Use only WebDav', 'external-files-from-webdav' );
 	}
 
 	/**
@@ -48,7 +47,7 @@ class Configuration extends Configuration_Base {
 	 */
 	public function get_dialog_hints(): array {
 		return array(
-			'<p>' . __( 'This will disable all other services except WebDav.', 'external-files-in-media-library' ) . '<br>' . __( 'After that, you will only be able to see and use WebDav for external sources.', 'external-files-in-media-library' ) . '</p>',
+			'<p>' . __( 'This will disable all other services except WebDav.', 'external-files-from-webdav' ) . '<br>' . __( 'After that, you will only be able to see and use WebDav for external sources.', 'external-files-from-webdav' ) . '</p>',
 		);
 	}
 
