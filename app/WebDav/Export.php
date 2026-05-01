@@ -71,7 +71,7 @@ class Export extends Export_Base {
 		$parse_url = wp_parse_url( $target );
 
 		// bail if scheme or host is not found in directory URL.
-		if ( ! isset( $parse_url['scheme'], $parse_url['host'] ) ) {
+		if ( ! isset( $parse_url['scheme'], $parse_url['host'], $parse_url['path'] ) ) {
 			return false;
 		}
 
@@ -172,7 +172,7 @@ class Export extends Export_Base {
 		$parse_url = wp_parse_url( $directory );
 
 		// bail if scheme or host is not found in directory URL.
-		if ( ! isset( $parse_url['scheme'], $parse_url['host'] ) ) {
+		if ( ! isset( $parse_url['scheme'], $parse_url['host'], $parse_url['path'] ) ) {
 			return false;
 		}
 
