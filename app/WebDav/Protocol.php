@@ -11,6 +11,7 @@ namespace ExternalFilesFromWebDav\WebDav;
 defined( 'ABSPATH' ) || exit;
 
 use ExternalFilesFromWebDav\WebDav;
+use ExternalFilesInMediaLibrary\ExternalFiles\Import;
 use ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base;
 use ExternalFilesInMediaLibrary\ExternalFiles\Protocols\Http;
 use ExternalFilesInMediaLibrary\ExternalFiles\Results;
@@ -52,9 +53,7 @@ class Protocol extends Protocol_Base {
 	}
 
 	/**
-	 * Check if URL is compatible with the given protocol by compare the protocol handler
-	 * and the start of the given URL with the supported protocols of this protocol handler
-	 * (e.g. 'http' or 'ftp').
+	 * Check if URL is compatible with this protocol.
 	 *
 	 * @return bool
 	 */
@@ -70,6 +69,15 @@ class Protocol extends Protocol_Base {
 		// try to get service name from other request param, if it is not yes set.
 		if ( is_null( $service_name ) ) {
 			$service_name = filter_input( INPUT_POST, 'method', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+		}
+
+		// try to get the service name by comparing the fields of a running import with the fields for WebDav.
+		if ( is_null( $service_name ) ) {
+			$request_fields = Import::get_instance()->get_fields();
+			$webdav_fields  = WebDav::get_instance()->get_fields();
+			if ( ! empty( $request_fields ) && array_keys( $request_fields ) === array_keys( $webdav_fields ) ) {
+				$service_name = WebDav::get_instance()->get_name();
+			}
 		}
 
 		// return result of comparing the given service name with ours.
@@ -200,6 +208,33 @@ class Protocol extends Protocol_Base {
 
 			// loop through the results and add each to the response.
 			foreach ( $directory_list as $file_name => $setting ) {
+				// get the file URL.
+				$file_url = $domain . urldecode( $file_name );
+
+				$false = false;
+				/**
+				 * Filter whether given WebDAV file should be hidden.
+				 *
+				 * @since 1.0.0 Available since 1.0.0.
+				 *
+				 * @param bool $false True if it should be hidden.
+				 * @param array<string,mixed> $file The array with the file data.
+				 * @param string $file_name The requested file.
+				 *
+				 * @noinspection PhpConditionAlreadyCheckedInspection
+				 */
+				if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $settings, $file_name ) ) {
+					continue;
+				}
+
+				// check for duplicate.
+				if ( $this->check_for_duplicate( $file_url ) ) {
+					Log::get_instance()->create( __( 'Given file already exist in your media library.', 'external-files-in-media-library' ), esc_url( $file_url ), 'error', 0, Import::get_instance()->get_identifier() );
+
+					// bail on a duplicate file.
+					continue;
+				}
+
 				/**
 				 * Run action just before the file check via WebDAV-protocol.
 				 *
@@ -207,7 +242,7 @@ class Protocol extends Protocol_Base {
 				 *
 				 * @param string $file_url   The URL to import.
 				 */
-				do_action( 'efmlwd_directory_import_file_check', $domain . $file_name );
+				do_action( 'efmlwd_directory_import_file_check', $file_url );
 
 				// bail if resource type is not null.
 				if ( ! is_null( $setting['{DAV:}resourcetype'] ) ) {
@@ -218,7 +253,7 @@ class Protocol extends Protocol_Base {
 				$results = array(
 					'title'         => basename( $file_name ),
 					'local'         => true,
-					'url'           => $domain . $file_name,
+					'url'           => $file_url,
 					'last-modified' => absint( strtotime( $setting['{DAV:}getlastmodified'] ) ),
 				);
 
@@ -236,7 +271,7 @@ class Protocol extends Protocol_Base {
 
 				// set settings for new sabre-client object.
 				$settings = array(
-					'baseUri'  => $domain . $file_name,
+					'baseUri'  => $file_url,
 					'userName' => $fields['login']['value'],
 					'password' => $fields['password']['value'],
 				);
@@ -339,9 +374,6 @@ class Protocol extends Protocol_Base {
 		 * @param string $directory The requested URL.
 		 */
 		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
-
-		// get WP Filesystem-handler.
-		$wp_filesystem = Helper::get_wp_filesystem();
 
 		// get a new client.
 		$client = WebDav::get_instance()->get_client( $settings, $domain, $directory );

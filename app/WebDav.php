@@ -110,7 +110,7 @@ class WebDav extends Service_Base implements Service {
 		add_action( 'init', array( $this, 'init_webdav' ), 30 );
 
 		// bail if user has no capability for this service.
-		if ( ! Helper::is_cli() && ! current_user_can( 'efml_cap_' . $this->get_name() ) ) {
+		if ( ! defined( 'DOING_CRON' ) && ! Helper::is_cli() && ! current_user_can( 'efml_cap_' . $this->get_name() ) ) {
 			return;
 		}
 
@@ -391,12 +391,15 @@ class WebDav extends Service_Base implements Service {
 
 		// loop through the list, add each file to the list and loop through each subdirectory.
 		foreach ( $directory_list as $file_name => $settings ) {
+			// decode the filename.
+			$cleaned_file_name = urldecode( $file_name );
+
 			// get directory-data for this file and add the file in the given directories.
 			$parts = explode( '/', str_replace( $path, '', $file_name ) );
 
 			// collect the entry.
 			$entry = array(
-				'title' => basename( $file_name ),
+				'title' => basename( $cleaned_file_name ),
 			);
 
 			// if array contains more than 1 entry this file is in a directory.
@@ -973,14 +976,5 @@ class WebDav extends Service_Base implements Service {
 
 		// set filter to enabled unsafe URL.
 		add_filter( 'http_request_args', array( $this, 'disable_check_for_unsafe_urls' ) );
-	}
-
-	/**
-	 * Return the default roles to use for this service.
-	 *
-	 * @return array<int,string>
-	 */
-	public function get_default_roles(): array {
-		return array( 'administrator', 'editor' );
 	}
 }
