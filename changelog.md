@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Updates translations
+
 ## [1.0.2] - 01.05.2026
 
 ### Changed
