@@ -948,7 +948,7 @@ class WebDav extends Service_Base implements Service {
 	/**
 	 * Disable the check for unsafe URLs.
 	 *
-	 * @param array<string,mixed> $parsed_args List of args for URL request.
+	 * @param array<string,mixed>       $parsed_args List of args for URL request.
 	 * @param Protocol_Base|string|null $url_or_instance The object.
 	 *
 	 * @return array<string,mixed>
