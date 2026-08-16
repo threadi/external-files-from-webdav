@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 use stdClass;
 
 /**
- * Object to hande updates from GitHub repository for this plugin.
+ * Object to handle updates from GitHub repository for this plugin.
  */
 class Updates {
 	/**
@@ -144,7 +144,7 @@ class Updates {
 					$res->slug             = $this->github_repository; // @phpstan-ignore property.notFound
 					$res->plugin           = plugin_basename( EFMLWD_PLUGIN );
 					$res->new_version      = $new_version_number; // @phpstan-ignore property.notFound
-					$res->tested           = '7.0'; // @phpstan-ignore property.notFound
+					$res->tested           = '7.1'; // @phpstan-ignore property.notFound
 					$res->package          = $asset->browser_download_url; // @phpstan-ignore property.notFound
 					$res->icons['default'] = trailingslashit( plugin_dir_url( EFML_PLUGIN ) ) . '/gfx/logo.png'; // @phpstan-ignore property.notFound
 

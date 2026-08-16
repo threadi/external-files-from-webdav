@@ -21,6 +21,7 @@ use ExternalFilesFromWebDav\WebDav\Export;
 use ExternalFilesInMediaLibrary\ExternalFiles\Export_Base;
 use ExternalFilesInMediaLibrary\ExternalFiles\File;
 use ExternalFilesInMediaLibrary\ExternalFiles\ImportDialog;
+use ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base;
 use ExternalFilesInMediaLibrary\ExternalFiles\Protocols;
 use easyDirectoryListingForWordPress\Crypt;
 use ExternalFilesInMediaLibrary\Plugin\Helper;
@@ -375,6 +376,9 @@ class WebDav extends Service_Base implements Service {
 			$error->add( 'efml_service_webdav', __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>' );
 			$this->add_error( $error );
 
+			// anonymize the password.
+			$settings = array_merge( $settings, array( 'password' => '************' ) );
+
 			// add log entry.
 			Log::get_instance()->create( __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code><br><br>' . __( 'Domain:', 'external-files-from-webdav' ) . ' <code>' . $domain . '</code><br><br>' . __( 'Path:', 'external-files-from-webdav' ) . ' <code>' . $path . '</code><br><br>' . __( 'Settings:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $settings ) . '</code>', $directory, 'error' );
 
@@ -390,7 +394,7 @@ class WebDav extends Service_Base implements Service {
 		);
 
 		// loop through the list, add each file to the list and loop through each subdirectory.
-		foreach ( $directory_list as $file_name => $settings ) {
+		foreach ( $directory_list as $file_name => $file_props ) {
 			// decode the filename.
 			$cleaned_file_name = urldecode( $file_name );
 
@@ -411,12 +415,12 @@ class WebDav extends Service_Base implements Service {
 				 * @since 1.0.0 Available since 1.0.0.
 				 *
 				 * @param bool $false True if it should be hidden.
-				 * @param array<string,mixed> $file The array with the file data.
+				 * @param array<string,mixed> $file_props The array with the file data.
 				 * @param string $file_name The requested file.
 				 *
 				 * @noinspection PhpConditionAlreadyCheckedInspection
 				 */
-				if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $settings, $file_name ) ) {
+				if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $file_props, $file_name ) ) {
 					continue;
 				}
 
@@ -430,10 +434,10 @@ class WebDav extends Service_Base implements Service {
 
 				// add settings for entry.
 				$entry['file']          = $domain . '/' . $file_name;
-				$entry['filesize']      = absint( $settings['{DAV:}getcontentlength'] );
+				$entry['filesize']      = absint( $file_props['{DAV:}getcontentlength'] );
 				$entry['mime-type']     = $mime_type['type'];
 				$entry['icon']          = '<span class="dashicons dashicons-media-default" data-type="' . esc_attr( $mime_type['type'] ) . '"></span>';
-				$entry['last-modified'] = Helper::get_format_date_time( gmdate( 'Y-m-d H:i:s', absint( strtotime( $settings['{DAV:}getlastmodified'] ) ) ) );
+				$entry['last-modified'] = Helper::get_format_date_time( gmdate( 'Y-m-d H:i:s', absint( strtotime( $file_props['{DAV:}getlastmodified'] ) ) ) );
 				$entry['preview']       = '';
 
 				// simply add the entry to the list if no directory data exist.
@@ -938,18 +942,35 @@ class WebDav extends Service_Base implements Service {
 		}
 
 		// add a filter.
-		add_filter( 'efml_http_header_args', array( $this, 'disable_check_for_unsafe_urls' ) );
+		add_filter( 'efml_http_header_args', array( $this, 'disable_check_for_unsafe_urls' ), 10, 2 );
 	}
 
 	/**
 	 * Disable the check for unsafe URLs.
 	 *
 	 * @param array<string,mixed> $parsed_args List of args for URL request.
+	 * @param Protocol_Base|string|null $url_or_instance The object.
 	 *
 	 * @return array<string,mixed>
 	 */
-	public function disable_check_for_unsafe_urls( array $parsed_args ): array {
+	public function disable_check_for_unsafe_urls( array $parsed_args, Protocol_Base|string|null $url_or_instance = null ): array {
+		// get the fields.
+		$fields = $this->get_fields();
+
+		// bail if no fields are given or instance is not "Protocol_Base".
+		if ( empty( $fields['server']['value'] ) || ! $url_or_instance instanceof Protocol_Base ) {
+			return $parsed_args;
+		}
+
+		// bail if requested URL is not ours.
+		if ( ! str_starts_with( $url_or_instance->get_url(), $fields['server']['value'] ) ) {
+			return $parsed_args;
+		}
+
+		// enable unsafe URLs.
 		$parsed_args['reject_unsafe_urls'] = false;
+
+		// return the resulting arguments for the request.
 		return $parsed_args;
 	}
 
@@ -975,6 +996,6 @@ class WebDav extends Service_Base implements Service {
 		}
 
 		// set filter to enabled unsafe URL.
-		add_filter( 'http_request_args', array( $this, 'disable_check_for_unsafe_urls' ) );
+		add_filter( 'http_request_args', array( $this, 'disable_check_for_unsafe_urls' ), 10, 2 );
 	}
 }
