@@ -170,106 +170,120 @@ class Protocol extends Protocol_Base {
 		// get a new client.
 		$client = WebDav::get_instance()->get_client( $settings, $domain, $directory );
 
-		// get the directory listing for the given path from the external WebDAV.
+		// get the object by direct request.
 		try {
-			// get the object by direct request.
 			$directory_list = $client->propFind( '', array(), 1 );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			$error_obj = new Url_Result();
+			$error_obj->set_result_text( __( 'Error occurred during requesting the directory listing.', 'external-files-from-webdav' ) );
+			$error_obj->set_url( $this->get_url() );
+			$error_obj->set_error( true );
+			Results::get_instance()->add( $error_obj );
 
-			// bail if returned array contains only 1 entry and index for the path does not exist.
-			if ( 1 === count( $directory_list ) && empty( $directory_list[ $path ] ) ) {
-				// create the error entry.
-				$error_obj = new Url_Result();
-				$error_obj->set_result_text( __( 'Got empty response from WebDAV for given file.', 'external-files-from-webdav' ) );
-				$error_obj->set_url( $this->get_url() );
-				$error_obj->set_error( true );
+			Log::get_instance()->create( __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $directory, 'error' );
 
-				// add the error object to the list of errors.
-				Results::get_instance()->add( $error_obj );
+			return array();
+		}
 
-				// do nothing more.
-				return array();
+		// bail if returned array contains only 1 entry and index for the path does not exist.
+		if ( 1 === count( $directory_list ) && empty( $directory_list[ $path ] ) ) {
+			// create the error entry.
+			$error_obj = new Url_Result();
+			$error_obj->set_result_text( __( 'Got empty response from WebDAV for given file.', 'external-files-from-webdav' ) );
+			$error_obj->set_url( $this->get_url() );
+			$error_obj->set_error( true );
+
+			// add the error object to the list of errors.
+			Results::get_instance()->add( $error_obj );
+
+			// do nothing more.
+			return array();
+		}
+
+		// collect the files.
+		$listing = array();
+
+		// set the used domain.
+		$url = $domain . $path;
+
+		/**
+		 * Run action if we have files to check via WebDav-protocol.
+		 *
+		 * @since 1.0.0 Available since 1.0.0.
+		 *
+		 * @param string        $url            The URL to import.
+		 * @param array<string> $directory_list List of matches (the URLs).
+		 */
+		do_action( 'efmlwd_directory_import_files', $url, $directory_list );
+
+		// collect errors.
+		$errors = array();
+
+		// loop through the results and add each to the response.
+		foreach ( $directory_list as $file_name => $setting ) {
+			// get the file URL.
+			$file_url = $domain . $file_name;
+
+			$false = false;
+			/**
+			 * Filter whether given WebDAV file should be hidden.
+			 *
+			 * @since        1.0.0 Available since 1.0.0.
+			 *
+			 * @param bool                $false     True if it should be hidden.
+			 * @param array<string,mixed> $file      The array with the file data.
+			 * @param string              $file_name The requested file.
+			 *
+			 * @noinspection PhpConditionAlreadyCheckedInspection
+			 */
+			if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $settings, $file_name ) ) {
+				continue;
 			}
 
-			// collect the files.
-			$listing = array();
+			// check for duplicate.
+			if ( $this->check_for_duplicate( $file_url ) || $this->check_for_duplicate( urldecode( $file_url ) ) ) {
+				Log::get_instance()->create( __( 'The given file already exist in your media library.', 'external-files-in-media-library' ), esc_url( $file_url ), 'error', 0, Import::get_instance()->get_identifier() );
 
-			// set the used domain.
-			$url = $domain . $path;
+				// bail on a duplicate file.
+				continue;
+			}
 
 			/**
-			 * Run action if we have files to check via WebDav-protocol.
+			 * Run action just before the file check via WebDAV-protocol.
 			 *
 			 * @since 1.0.0 Available since 1.0.0.
 			 *
-			 * @param string $url   The URL to import.
-			 * @param array<string> $directory_list List of matches (the URLs).
+			 * @param string $file_url The URL to import.
 			 */
-			do_action( 'efmlwd_directory_import_files', $url, $directory_list );
+			do_action( 'efmlwd_directory_import_file_check', $file_url );
 
-			// loop through the results and add each to the response.
-			foreach ( $directory_list as $file_name => $setting ) {
-				// get the file URL.
-				$file_url = $domain . urldecode( $file_name );
+			// bail if resource type is not null.
+			if ( ! is_null( $setting['{DAV:}resourcetype'] ) ) {
+				continue;
+			}
 
-				$false = false;
-				/**
-				 * Filter whether given WebDAV file should be hidden.
-				 *
-				 * @since 1.0.0 Available since 1.0.0.
-				 *
-				 * @param bool $false True if it should be hidden.
-				 * @param array<string,mixed> $file The array with the file data.
-				 * @param string $file_name The requested file.
-				 *
-				 * @noinspection PhpConditionAlreadyCheckedInspection
-				 */
-				if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $settings, $file_name ) ) {
-					continue;
-				}
+			// initialize basic array for file data.
+			$results = array(
+				'title'         => basename( urldecode( $file_name ) ),
+				'local'         => true,
+				'url'           => $file_url,
+				'last-modified' => absint( strtotime( $setting['{DAV:}getlastmodified'] ) ),
+			);
 
-				// check for duplicate.
-				if ( $this->check_for_duplicate( $file_url ) ) {
-					Log::get_instance()->create( __( 'Given file already exist in your media library.', 'external-files-in-media-library' ), esc_url( $file_url ), 'error', 0, Import::get_instance()->get_identifier() );
+			// get mime type.
+			$mime_type = wp_check_filetype( $results['title'] );
 
-					// bail on a duplicate file.
-					continue;
-				}
+			// set the file size.
+			$results['filesize'] = absint( $setting['{DAV:}getcontentlength'] );
 
-				/**
-				 * Run action just before the file check via WebDAV-protocol.
-				 *
-				 * @since 1.0.0 Available since 1.0.0.
-				 *
-				 * @param string $file_url   The URL to import.
-				 */
-				do_action( 'efmlwd_directory_import_file_check', $file_url );
+			// set the mime type.
+			$results['mime-type'] = $mime_type['type'];
 
-				// bail if resource type is not null.
-				if ( ! is_null( $setting['{DAV:}resourcetype'] ) ) {
-					continue;
-				}
+			// set the file as tmp-file for import.
+			$results['tmp-file'] = wp_tempnam();
 
-				// initialize basic array for file data.
-				$results = array(
-					'title'         => basename( $file_name ),
-					'local'         => true,
-					'url'           => $file_url,
-					'last-modified' => absint( strtotime( $setting['{DAV:}getlastmodified'] ) ),
-				);
-
-				// get mime type.
-				$mime_type = wp_check_filetype( $results['title'] );
-
-				// set the file size.
-				$results['filesize'] = absint( $setting['{DAV:}getcontentlength'] );
-
-				// set the mime type.
-				$results['mime-type'] = $mime_type['type'];
-
-				// set the file as tmp-file for import.
-				$results['tmp-file'] = wp_tempnam();
-
-				// set settings for new sabre-client object.
+			// set settings for new sabre-client object.
+			try {
 				$settings = array(
 					'baseUri'  => $file_url,
 					'userName' => $fields['login']['value'],
@@ -284,30 +298,47 @@ class Protocol extends Protocol_Base {
 
 				// save the content.
 				$wp_filesystem->put_contents( $results['tmp-file'], $file_data['body'] );
+			} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+				// clean up the tmp file.
+				$wp_filesystem->delete( $results['tmp-file'] );
 
-				// add the file to the list.
-				$listing[] = $results;
+				// collect the error.
+				$errors[ $file_url ] = $e->getMessage();
+
+				// get next file.
+				continue;
 			}
 
-			// return the resulting array as list of files (although it is only one).
-			return $listing;
-		} catch ( ClientHttpException | Error $e ) {
-			// create the error entry.
-			$error_obj = new Url_Result();
-			/* translators: %1$s will be replaced by a URL. */
-			$error_obj->set_result_text( sprintf( __( 'Error occurred during requesting this file. Check the <a href="%1$s" target="_blank">log</a> for detailed information.', 'external-files-from-webdav' ), Helper::get_log_url( $this->get_url() ) ) );
-			$error_obj->set_url( $this->get_url() );
-			$error_obj->set_error( true );
-
-			// add the error object to the list of errors.
-			Results::get_instance()->add( $error_obj );
-
-			// add log entry.
-			Log::get_instance()->create( __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code><br><br>' . __( 'Domain:', 'external-files-from-webdav' ) . ' <code>' . $domain . '</code><br><br>' . __( 'Path:', 'external-files-from-webdav' ) . ' <code>' . $path . '</code><br><br>' . __( 'Settings:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $settings ) . '</code>', $directory, 'error' );
-
-			// do nothing more.
-			return array();
+			// add the file to the list.
+			$listing[] = $results;
 		}
+
+		// collect all errors in one log entry.
+		if ( ! empty( $errors ) ) {
+			$error_lines = array();
+			foreach ( $errors as $failed_url => $message ) {
+				$error_lines[] = '<code>' . esc_html( $failed_url ) . '</code>: <code>' . esc_html( $message ) . '</code>';
+			}
+
+			Log::get_instance()->create(
+				sprintf(
+				/* translators: %1$d will be replaced by the number of failed files, %2$s by the list of errors. */
+					_n(
+						'%1$d file could not be loaded during WebDAV import:<br><br>%2$s',
+						'%1$d files could not be loaded during WebDAV import:<br><br>%2$s',
+						count( $errors ),
+						'external-files-from-webdav'
+					),
+					count( $errors ),
+					implode( '<br>', $error_lines )
+				),
+				$directory,
+				'error'
+			);
+		}
+
+		// return the resulting array as list of files (although it is only one).
+		return $listing;
 	}
 
 	/**
