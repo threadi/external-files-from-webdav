@@ -11,6 +11,7 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       external-files-from-webdav
+ * Update URI:        https://github.com/threadi/external-files-from-webdav
  *
  * @package external-files-from-webdav
  */

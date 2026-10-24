@@ -410,7 +410,24 @@ class Protocol extends Protocol_Base {
 		$client = WebDav::get_instance()->get_client( $settings, $domain, $directory );
 
 		// get the object by direct request.
-		$file_data = $client->propFind( $path, array() );
+		try {
+			$file_data = $client->propFind( $path, array() );
+		} catch ( ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			// create the error entry.
+			$error_obj = new Url_Result();
+			$error_obj->set_result_text( __( 'Error occurred during requesting the directory listing.', 'external-files-from-webdav' ) );
+			$error_obj->set_url( $url );
+			$error_obj->set_error( true );
+
+			// add the error object to the list of errors.
+			Results::get_instance()->add( $error_obj );
+
+			// log this event.
+			Log::get_instance()->create( __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $url, 'error' );
+
+			// do nothing more.
+			return array();
+		}
 
 		// bail if we got an empty response.
 		if ( empty( $file_data ) ) {
@@ -429,12 +446,12 @@ class Protocol extends Protocol_Base {
 
 		// initialize the file infos array.
 		$results = array(
-			'title'         => basename( $path ),
-			'filesize'      => $file_data['{DAV:}getcontentlength'],
-			'mime-type'     => $file_data['{DAV:}getcontenttype'],
+			'title'         => basename( urldecode( $path ) ),
+			'filesize'      => absint( $file_data['{DAV:}getcontentlength'] ?? 0 ),
+			'mime-type'     => $file_data['{DAV:}getcontenttype'] ?? '',
 			'local'         => true,
 			'url'           => $url,
-			'last-modified' => $file_data['{DAV:}getlastmodified'],
+			'last-modified' => $file_data['{DAV:}getlastmodified'] ?? '',
 		);
 
 		// get WP Filesystem-handler.

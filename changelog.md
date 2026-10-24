@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0] - 24.10.2026
+
+### Added
+
+- Added PHP Unit tests incl. GitHub action to run them
+- Added support for auto-updates via "Update URI"
+
+### Fixed
+
+- Fixed export to external sources in sub-directories of WebDAV
+- Fixed missing error handling if WebDAV returns an error during export of a file
+- Fixed missing error handling if WebDAV returns an error while requesting a single file
+- Fixed detection of set credentials for the connection form
+- Fixed double slash in file URLs and encoded directory names in directory listing
+
 ## [1.0.3] - 16.08.2026
 
 ### Changed
