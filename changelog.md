@@ -7,6 +7,10 @@
 - Added PHP Unit tests incl. GitHub action to run them
 - Added support for auto-updates via "Update URI"
 
+### Changed
+
+- Updated translations
+
 ### Fixed
 
 - Fixed export to external sources in sub-directories of WebDAV
