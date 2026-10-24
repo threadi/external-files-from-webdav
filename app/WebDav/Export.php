@@ -127,10 +127,18 @@ class Export extends Export_Base {
 		}
 
 		// set the upload path we will use for this file.
-		$upload_path = $credentials['fields']['path']['value'] . $credentials['fields']['login']['value'] . $parse_url['path'];
+		$upload_path = $this->get_upload_path( $credentials['fields'], $parse_url['path'] );
 
 		// upload the file to the given path.
-		$result = $client->request( 'PUT', $upload_path, (string) $wp_filesystem_local->get_contents( $file_path ) );
+		try {
+			$result = $client->request( 'PUT', $upload_path, (string) $wp_filesystem_local->get_contents( $file_path ) );
+		} catch ( Exception $e ) {
+			// log this event.
+			Log::get_instance()->create( __( 'Error occurred during request to export a file to WebDav:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $target, 'error' );
+
+			// do nothing more.
+			return false;
+		}
 
 		// list of allowed status codes.
 		$status_codes = array( 201, 204 );
@@ -201,7 +209,7 @@ class Export extends Export_Base {
 		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
 		// set the upload path we will use for this file.
-		$upload_path = $credentials['fields']['path']['value'] . $credentials['fields']['login']['value'] . $parse_url['path'];
+		$upload_path = $this->get_upload_path( $credentials['fields'], $parse_url['path'] );
 
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
@@ -236,5 +244,30 @@ class Export extends Export_Base {
 
 		// return true as the file has been deleted.
 		return true;
+	}
+
+	/**
+	 * Return the path of a file on the WebDAV server for the given path from the URL.
+	 *
+	 * The URL of an external source is the domain (main directory) or the complete URL of a directory
+	 * on the WebDAV server (sub-directory). The configured WebDAV path (e.g. "/remote.php/dav/files/") and the
+	 * login are only added if they are not already part of the path.
+	 *
+	 * @param array<string,mixed> $fields The fields of the connection.
+	 * @param string              $path   The path from the URL.
+	 *
+	 * @return string
+	 */
+	private function get_upload_path( array $fields, string $path ): string {
+		// get the base path on the WebDAV server.
+		$base_path = $fields['path']['value'] . $fields['login']['value'];
+
+		// return the path as it is, if it already contains the base path.
+		if ( str_starts_with( $path, trailingslashit( $base_path ) ) ) {
+			return $path;
+		}
+
+		// return the path with the base path.
+		return $base_path . $path;
 	}
 }

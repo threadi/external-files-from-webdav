@@ -433,7 +433,7 @@ class WebDav extends Service_Base implements Service {
 				}
 
 				// add settings for entry.
-				$entry['file']          = $domain . '/' . $file_name;
+				$entry['file']          = $domain . '/' . ltrim( $file_name, '/' );
 				$entry['filesize']      = absint( $file_props['{DAV:}getcontentlength'] );
 				$entry['mime-type']     = $mime_type['type'];
 				$entry['icon']          = '<span class="dashicons dashicons-media-default" data-type="' . esc_attr( $mime_type['type'] ) . '"></span>';
@@ -471,7 +471,7 @@ class WebDav extends Service_Base implements Service {
 					// add it to the directory list, if it does not already exist.
 					if ( ! isset( $listing['dirs'][ $index ] ) ) {
 						$listing['dirs'][ $index ] = array(
-							'title' => basename( $dir ),
+							'title' => urldecode( basename( $dir ) ),
 							'files' => array(),
 							'dirs'  => array(),
 						);
@@ -915,8 +915,8 @@ class WebDav extends Service_Base implements Service {
 		// get the fields.
 		$fields = $this->get_fields();
 
-		// return whether both credentials are set.
-		return ! empty( $fields['server'] ) && ! empty( $fields['login'] ) && ! empty( $fields['password'] );
+		// return whether server and credentials are set.
+		return ! empty( $fields['server']['value'] ) && ! empty( $fields['login']['value'] ) && ! empty( $fields['password']['value'] );
 	}
 
 	/**

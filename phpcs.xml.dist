@@ -13,6 +13,7 @@
     -->
     <exclude-pattern>*/languages/*</exclude-pattern>
     <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
 
     <!-- Use additional rulesets -->
     <rule ref="WordPress-Docs"/>

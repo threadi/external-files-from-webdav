@@ -50,13 +50,10 @@ class Uninstall {
 	/**
 	 * Run uninstallation of this plugin.
 	 *
-	 * Hint:
-	 * First set all settings as if the plugin is active.
-	 * Then delete all these settings from DB and disable all.
-	 *
 	 * @return void
 	 */
 	public function run(): void {
-		// TODO to add.
+		// remove the cached data of the latest release.
+		Updates::get_instance()->delete_cache();
 	}
 }

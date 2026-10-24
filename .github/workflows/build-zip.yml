@@ -27,6 +27,9 @@ jobs:
           rm .editorconfig
           rm changelog.md
           rm readme.md
+          rm -fr tests
+          rm -fr bin
+          rm phpunit.xml.dist
 
       - uses: anchore/sbom-action@v0
 
