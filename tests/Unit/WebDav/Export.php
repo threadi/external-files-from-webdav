@@ -217,4 +217,67 @@ class Export extends externalFilesFromWebDavTests {
 		$this->assertFalse( $this->get_export()->delete_exported_file( $this->domain, $this->get_credentials(), 1 ) );
 		$this->assertEmpty( $this->get_webdav_requests() );
 	}
+
+	/**
+	 * Test the export of a file into new folders below the directory of the external source.
+	 *
+	 * @dataProvider sources_provider
+	 *
+	 * @param string $source The path of the external source.
+	 * @param string $path   The expected path of the directory on the WebDAV server.
+	 *
+	 * @return void
+	 */
+	public function test_export_file_into_folders( string $source, string $path ): void {
+		$attachment_id = $this->create_local_attachment();
+		$file_name     = basename( (string) get_attached_file( $attachment_id, true ) );
+		$this->assertTrue( $this->get_export()->supports_folders() );
+
+		// the first folder exists already, the second must be created.
+		$this->add_webdav_response( 'MKCOL', $this->domain . $path . '2026/', 405 );
+		$this->add_webdav_response( 'MKCOL', $this->domain . $path . '2026/11/', 201 );
+		$this->add_webdav_response( 'PUT', $this->domain . $path . '2026/11/' . $file_name, 201 );
+
+		$credentials              = $this->get_credentials();
+		$credentials['directory'] = $source;
+		$url                      = $this->get_export()->export_file( $attachment_id, trailingslashit( $source ) . '2026/11/' . $file_name, $credentials );
+		$this->assertEquals( $this->domain . $path . '2026/11/' . $file_name, $url );
+
+		// check the order of the requests.
+		$requests = $this->get_webdav_requests();
+		$this->assertCount( 3, $requests );
+		$this->assertEquals( array( 'MKCOL', 'MKCOL', 'PUT' ), array_column( $requests, 'method' ) );
+	}
+
+	/**
+	 * Test the export of a file, if a folder could not be created.
+	 *
+	 * @return void
+	 */
+	public function test_export_file_into_folder_with_error(): void {
+		$attachment_id = $this->create_local_attachment();
+		$file_name     = basename( (string) get_attached_file( $attachment_id, true ) );
+		$this->add_webdav_response( 'MKCOL', $this->domain . '/remote.php/dav/files/user/2026/', 403 );
+
+		$credentials              = $this->get_credentials();
+		$credentials['directory'] = $this->domain;
+		$target                   = $this->domain . '/2026/' . $file_name;
+		$this->assertFalse( $this->get_export()->export_file( $attachment_id, $target, $credentials ) );
+		$this->assertCount( 1, $this->get_webdav_requests() );
+		$this->assertNotEmpty( $this->get_log_entries( $target ) );
+	}
+
+	/**
+	 * Test if relative folders are never created.
+	 *
+	 * @return void
+	 */
+	public function test_get_folders_from_target(): void {
+		$credentials = array( 'directory' => 'https://webdav.example.com/Photos/' );
+		$this->assertEquals( array( '2026', '11' ), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Photos/2026/11/file.jpg', $credentials ) ) );
+		$this->assertEquals( array(), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Photos/file.jpg', $credentials ) ) );
+		$this->assertEquals( array(), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Other/2026/file.jpg', $credentials ) ) );
+		$this->assertEquals( array(), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Photos/../2026/file.jpg', $credentials ) ) );
+		$this->assertEquals( array(), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Photos/2026/file.jpg', array() ) ) );
+	}
 }

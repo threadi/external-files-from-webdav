@@ -15,6 +15,8 @@ use ExternalFilesFromWebDav\WebDav;
 use ExternalFilesInMediaLibrary\ExternalFiles\Export_Base;
 use ExternalFilesInMediaLibrary\Plugin\Helper;
 use ExternalFilesInMediaLibrary\Plugin\Log;
+use Sabre\DAV\Client;
+use Sabre\HTTP\ClientHttpException;
 
 /**
  * Object for export files to AWS S3.
@@ -128,6 +130,12 @@ class Export extends Export_Base {
 
 		// set the upload path we will use for this file.
 		$upload_path = $this->get_upload_path( $fields, $parse_url['path'] );
+
+		// create the folders of the target below the directory, if they do not exist (e.g., for the folder structure of exports).
+		$folders = $this->get_folders_from_target( $target, $credentials );
+		if ( ! empty( $folders ) && ! $this->create_folders( $client, $upload_path, $folders, $target ) ) {
+			return false;
+		}
 
 		// upload the file to the given path.
 		try {
@@ -243,6 +251,111 @@ class Export extends Export_Base {
 		}
 
 		// return true as the file has been deleted.
+		return true;
+	}
+
+	/**
+	 * Return whether this service supports folders for exported files.
+	 *
+	 * @return bool
+	 */
+	public function supports_folders(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the folders of the given target below the directory of the external source.
+	 *
+	 * Returns an empty list if the target is located directly in the directory of the external source
+	 * or not located in it at all.
+	 *
+	 * @param string              $target The target path of the file.
+	 * @param array<string,mixed> $credentials The credentials of the external source.
+	 *
+	 * @return array<int,string>
+	 */
+	private function get_folders_from_target( string $target, array $credentials ): array {
+		// get the directory from the credentials.
+		$directory = isset( $credentials['directory'] ) && is_string( $credentials['directory'] ) ? trailingslashit( $credentials['directory'] ) : '';
+
+		// bail if no directory is set or the target is not located in it.
+		if ( '' === $directory || ! str_starts_with( $target, $directory ) ) {
+			return array();
+		}
+
+		// get the folders of the target below the directory.
+		$folders = array();
+		foreach ( explode( '/', dirname( substr( $target, strlen( $directory ) ) ) ) as $folder ) {
+			// bail on relative folders.
+			if ( '..' === $folder ) {
+				return array();
+			}
+
+			// skip empty folders.
+			if ( '' === $folder || '.' === $folder ) {
+				continue;
+			}
+
+			// add the folder.
+			$folders[] = $folder;
+		}
+
+		// return the list of folders.
+		return $folders;
+	}
+
+	/**
+	 * Create the given folders of the upload path on the WebDAV server, if they do not exist.
+	 *
+	 * @param Client            $client The WebDAV client.
+	 * @param string            $upload_path The path of the file to upload.
+	 * @param array<int,string> $folders The folders at the end of the upload path, which should exist.
+	 * @param string            $target The target for logging.
+	 *
+	 * @return bool
+	 */
+	private function create_folders( Client $client, string $upload_path, array $folders, string $target ): bool {
+		// get the path of the folder, which contains the folders.
+		$folder_path = dirname( $upload_path );
+		$path        = substr( $folder_path, 0, strlen( $folder_path ) - strlen( implode( '/', $folders ) ) );
+
+		// create each folder.
+		foreach ( $folders as $folder ) {
+			$path = trailingslashit( $path ) . $folder;
+
+			// create the folder.
+			try {
+				$result = $client->request( 'MKCOL', trailingslashit( $path ) );
+			} catch ( ClientHttpException $e ) {
+				// the folder does already exist.
+				if ( 405 === $e->getHttpStatus() ) {
+					continue;
+				}
+
+				// log this event.
+				Log::get_instance()->create( __( 'Error occurred during request to create a folder on WebDav:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $target, 'error' );
+
+				// do nothing more.
+				return false;
+			} catch ( Exception $e ) {
+				// log this event.
+				Log::get_instance()->create( __( 'Error occurred during request to create a folder on WebDav:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $target, 'error' );
+
+				// do nothing more.
+				return false;
+			}
+
+			// bail if the folder could not be created and does not exist (405 = folder already exists).
+			if ( ! in_array( absint( $result['statusCode'] ), array( 201, 405 ), true ) ) {
+				// log this event.
+				Log::get_instance()->create( __( 'Got unsupported status code from WebDav during creation of a folder:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $result ) . '</code>', $target, 'error' );
+
+				// do nothing more.
+				return false;
+			}
+		}
+
+		// return true as all folders exist.
 		return true;
 	}
 
