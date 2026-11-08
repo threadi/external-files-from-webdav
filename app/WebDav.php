@@ -46,6 +46,16 @@ class WebDav extends Service_Base implements Service {
 	protected string $name = 'webdav';
 
 	/**
+	 * Name of the field, which contains the URL of the server.
+	 *
+	 * If the credentials are defined via constants, they are only used for this server.
+	 * Requires "External Files in Media Library" 5.7.0 or newer.
+	 *
+	 * @var string
+	 */
+	protected string $constants_host_field = 'server';
+
+	/**
 	 * The public label.
 	 *
 	 * @var string
@@ -183,49 +193,61 @@ class WebDav extends Service_Base implements Service {
 
 		// add setting.
 		if ( defined( 'EFML_ACTIVATION_RUNNING' ) || 'global' === get_option( 'eml_' . $this->get_name() . '_credentials_vault' ) ) {
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_server' );
-			$setting->set_section( $section );
-			$setting->set_autoload( false );
-			$setting->set_type( 'string' );
-			$field = new Text( $settings_obj );
-			$field->set_title( __( 'WebDAV Server', 'external-files-from-webdav' ) );
-			$field->set_placeholder( __( 'https://nextcloud.local', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'server', __( 'WebDAV Server', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_server' );
+				$setting->set_section( $section );
+				$setting->set_autoload( false );
+				$setting->set_type( 'string' );
+				$field = new Text( $settings_obj );
+				$field->set_title( __( 'WebDAV Server', 'external-files-from-webdav' ) );
+				$field->set_placeholder( __( 'https://nextcloud.local', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_login' );
-			$setting->set_section( $section );
-			$setting->set_autoload( false );
-			$setting->set_type( 'string' );
-			$setting->set_read_callback( array( $this, 'decrypt_value' ) );
-			$setting->set_save_callback( array( $this, 'encrypt_value' ) );
-			$field = new Text( $settings_obj );
-			$field->set_title( __( 'Login', 'external-files-from-webdav' ) );
-			$field->set_placeholder( __( 'Your login', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'login', __( 'Login', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_login' );
+				$setting->set_section( $section );
+				$setting->set_autoload( false );
+				$setting->set_type( 'string' );
+				$setting->set_read_callback( array( $this, 'decrypt_value' ) );
+				$setting->set_save_callback( array( $this, 'encrypt_value' ) );
+				$field = new Text( $settings_obj );
+				$field->set_title( __( 'Login', 'external-files-from-webdav' ) );
+				$field->set_placeholder( __( 'Your login', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_password' );
-			$setting->set_section( $section );
-			$setting->set_autoload( false );
-			$setting->set_type( 'string' );
-			$setting->set_read_callback( array( $this, 'decrypt_value' ) );
-			$setting->set_save_callback( array( $this, 'encrypt_value' ) );
-			$field = new Password( $settings_obj );
-			$field->set_title( __( 'Password', 'external-files-from-webdav' ) );
-			$field->set_placeholder( __( 'Your password', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'password', __( 'Password', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_password' );
+				$setting->set_section( $section );
+				$setting->set_autoload( false );
+				$setting->set_type( 'string' );
+				$setting->set_read_callback( array( $this, 'decrypt_value' ) );
+				$setting->set_save_callback( array( $this, 'encrypt_value' ) );
+				$field = new Password( $settings_obj );
+				$field->set_title( __( 'Password', 'external-files-from-webdav' ) );
+				$field->set_placeholder( __( 'Your password', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_path' );
-			$setting->set_section( $section );
-			$setting->set_type( 'string' );
-			$setting->set_default( '/remote.php/dav/files/' );
-			$field = new Text( $settings_obj );
-			$field->set_title( __( 'Path', 'external-files-from-webdav' ) );
-			$field->set_description( __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'path', __( 'Path', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_path' );
+				$setting->set_section( $section );
+				$setting->set_type( 'string' );
+				$setting->set_default( '/remote.php/dav/files/' );
+				$field = new Text( $settings_obj );
+				$field->set_title( __( 'Path', 'external-files-from-webdav' ) );
+				$field->set_description( __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 		}
 
 		// show hint for user settings.
@@ -582,6 +604,11 @@ class WebDav extends Service_Base implements Service {
 
 		// get from global setting, if enabled.
 		if ( $this->is_mode( 'global' ) ) {
+			// use the path from the fields, if it is defined via constant.
+			if ( ! empty( $fields['path']['constant'] ) && ! empty( $fields['path']['value'] ) ) {
+				return $fields['path']['value'] . $fields['login']['value'] . '/';
+			}
+
 			// return path from settings.
 			return get_option( 'eml_webdav_path' ) . $fields['login']['value'] . '/';
 		}
@@ -797,13 +824,66 @@ class WebDav extends Service_Base implements Service {
 	 * @return string
 	 */
 	public function get_directory(): string {
+		// get the fields incl. values from constants.
+		$fields = $this->get_fields();
+
 		// bail if no directory is set.
-		if ( empty( $this->fields['server']['value'] ) ) {
+		if ( empty( $fields['server']['value'] ) || ! is_string( $fields['server']['value'] ) ) {
 			return '';
 		}
 
 		// return the directory.
-		return $this->fields['server']['value'];
+		return $fields['server']['value'];
+	}
+
+	/**
+	 * Return the list of required fields, which must all be defined via constants to use any constant.
+	 *
+	 * The path is optional, as it has a default value.
+	 *
+	 * @return array<int,string>
+	 */
+	public function get_required_fields_for_constants(): array {
+		return array_values( array_diff( parent::get_required_fields_for_constants(), array( 'path' ) ) );
+	}
+
+	/**
+	 * Return the fields of a saved external source incl. the values of constants for the given URL.
+	 *
+	 * The values of constants are only used for the server defined via constants.
+	 *
+	 * @param array<string,mixed> $fields The fields.
+	 * @param string              $url    The URL.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function get_fields_for_url( array $fields, string $url ): array {
+		// bail if the main plugin does not support constants (requires "External Files in Media Library" 5.7.0 or newer).
+		if ( ! method_exists( $this, 'apply_constants_to_fields' ) ) { // @phpstan-ignore function.alreadyNarrowedType
+			return $fields;
+		}
+
+		// return the fields incl. the values of constants.
+		return $this->apply_constants_to_fields( $fields, $url );
+	}
+
+	/**
+	 * Show a non-editable hint instead of a setting, if the value of the given field is defined via constant.
+	 *
+	 * @param Section $section    The section for the setting.
+	 * @param string  $field_name The name of the field.
+	 * @param string  $title      The title of the setting.
+	 *
+	 * @return bool True if the hint has been added, false if the setting should be added.
+	 */
+	protected function show_constant_hint( Section $section, string $field_name, string $title ): bool {
+		// bail if the main plugin does not support this (requires "External Files in Media Library" 5.7.0 or newer).
+		if ( ! method_exists( $this, 'add_constant_hint_setting' ) ) { // @phpstan-ignore function.alreadyNarrowedType
+			return false;
+		}
+
+		// add the hint, if the value is defined via constant.
+		return $this->add_constant_hint_setting( $section, $field_name, $title );
 	}
 
 	/**

@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added possibility to define the credentials via constants, e.g. in wp-config.php (requires External Files in Media Library 5.7.0)
+- Credentials from constants are only used for the server defined via constant, saved external sources on other servers are not usable then
+- Added documentation for the constants in docs/constants.md
+
 ## [1.1.0] - 24.10.2026
 
 ### Added

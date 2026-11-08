@@ -76,7 +76,7 @@ class Export extends Export_Base {
 		}
 
 		// get the fields.
-		$fields = $credentials['fields'];
+		$fields = $webdav_object->get_fields_for_url( $credentials['fields'], $target );
 
 		// set the requested domain.
 		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
@@ -127,7 +127,7 @@ class Export extends Export_Base {
 		}
 
 		// set the upload path we will use for this file.
-		$upload_path = $this->get_upload_path( $credentials['fields'], $parse_url['path'] );
+		$upload_path = $this->get_upload_path( $fields, $parse_url['path'] );
 
 		// upload the file to the given path.
 		try {
@@ -185,7 +185,7 @@ class Export extends Export_Base {
 		}
 
 		// get the fields.
-		$fields = $credentials['fields'];
+		$fields = $webdav_object->get_fields_for_url( $credentials['fields'], $directory );
 
 		// set the requested domain.
 		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
@@ -209,7 +209,7 @@ class Export extends Export_Base {
 		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
 		// set the upload path we will use for this file.
-		$upload_path = $this->get_upload_path( $credentials['fields'], $parse_url['path'] );
+		$upload_path = $this->get_upload_path( $fields, $parse_url['path'] );
 
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
