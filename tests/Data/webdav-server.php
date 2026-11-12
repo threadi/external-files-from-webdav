@@ -7,6 +7,7 @@
  * - /redirect.bin: redirects to /file.bin.
  * - /missing.bin: returns 404 with a body.
  * - /upload.bin: saves the body of a PUT request in the file given in EFMLWD_TEST_UPLOAD.
+ * - /upload-auth.bin: like /upload.bin, but requires Basic auth.
  *
  * @package external-files-from-webdav
  */
@@ -37,7 +38,15 @@ if ( '/redirect.bin' === $path ) {
 	return true;
 }
 
-if ( '/upload.bin' === $path && 'PUT' === $_SERVER['REQUEST_METHOD'] ) {
+// require Basic auth for the upload, so the client first gets a challenge, if it negotiates the authentication.
+if ( '/upload-auth.bin' === $path && ( ! isset( $_SERVER['PHP_AUTH_USER'] ) || 'user' !== $_SERVER['PHP_AUTH_USER'] || 'secret' !== $_SERVER['PHP_AUTH_PW'] ) ) {
+	http_response_code( 401 );
+	header( 'WWW-Authenticate: Basic realm="test"' );
+	echo 'body of the authentication challenge';
+	return true;
+}
+
+if ( in_array( $path, array( '/upload.bin', '/upload-auth.bin' ), true ) && 'PUT' === $_SERVER['REQUEST_METHOD'] ) {
 	$in  = fopen( 'php://input', 'rb' );
 	$out = fopen( getenv( 'EFMLWD_TEST_UPLOAD' ), 'wb' );
 	stream_copy_to_stream( $in, $out );

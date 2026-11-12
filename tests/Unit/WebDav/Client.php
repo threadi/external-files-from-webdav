@@ -280,14 +280,64 @@ class Client extends externalFilesFromWebDavTests {
 	/**
 	 * Test the upload of a large file as stream, like the export does it.
 	 *
+	 * Without negotiation of the authentication (here with Basic auth only, which curl sends directly) the
+	 * file is not loaded into memory.
+	 *
 	 * @return void
 	 */
 	public function test_upload_as_stream(): void {
 		$handle = fopen( self::$source_file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$client = new WebDav\Client(
+			array(
+				'baseUri'  => self::$server_url . '/upload-auth.bin',
+				'userName' => 'user',
+				'password' => 'secret',
+				'authType' => WebDav\Client::AUTH_BASIC,
+			)
+		);
 
 		memory_reset_peak_usage();
 		$memory = memory_get_usage();
-		$result = $this->get_client( '/upload.bin' )->request( 'PUT', '', $handle );
+		$result = $client->request( 'PUT', '', $handle );
+		$peak   = memory_get_peak_usage() - $memory;
+		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		$this->assertEquals( 201, $result['statusCode'] );
+		$this->assertEquals( md5_file( self::$source_file ), md5_file( self::$upload_file ) );
+		$this->assertLessThan( self::FILE_SIZE / 4, $peak );
+	}
+
+	/**
+	 * Test the upload as stream with negotiation of the authentication (Basic and Digest auth, the default of Sabre)
+	 * via HTTP: curl could not send a stream again after the challenge of the server, so the body is loaded into
+	 * memory and the upload works.
+	 *
+	 * Via HTTPS the credentials are sent directly via Basic auth, which is tested in the integration tests.
+	 *
+	 * @return void
+	 */
+	public function test_upload_as_stream_with_negotiation_of_authentication(): void {
+		$handle = fopen( self::$source_file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		$result = $this->get_client( '/upload-auth.bin' )->request( 'PUT', '', $handle );
+		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		$this->assertEquals( 201, $result['statusCode'] );
+		$this->assertEquals( md5_file( self::$source_file ), md5_file( self::$upload_file ) );
+	}
+
+	/**
+	 * Test the upload as stream without credentials.
+	 *
+	 * @return void
+	 */
+	public function test_upload_as_stream_without_credentials(): void {
+		$handle = fopen( self::$source_file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$client = new WebDav\Client( array( 'baseUri' => self::$server_url . '/upload.bin' ) );
+
+		memory_reset_peak_usage();
+		$memory = memory_get_usage();
+		$result = $client->request( 'PUT', '', $handle );
 		$peak   = memory_get_peak_usage() - $memory;
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 

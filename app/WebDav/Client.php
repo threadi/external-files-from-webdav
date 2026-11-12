@@ -40,6 +40,13 @@ class Client extends \Sabre\DAV\Client {
 	private string $download_headers = '';
 
 	/**
+	 * Whether the actual request should send the credentials directly via Basic auth.
+	 *
+	 * @var bool
+	 */
+	private bool $preemptive_basic_auth = false;
+
+	/**
 	 * Download the given URL into the given local file.
 	 *
 	 * Only the body of a successful response (status 2xx) is written into the file, not the bodies of
@@ -91,6 +98,11 @@ class Client extends \Sabre\DAV\Client {
 		// get the settings of the original client.
 		$settings = parent::createCurlSettingsArray( $request );
 
+		// send the credentials directly via Basic auth, if requested for an upload as stream.
+		if ( $this->preemptive_basic_auth ) {
+			$settings[ CURLOPT_HTTPAUTH ] = CURLAUTH_BASIC;
+		}
+
 		// bail if this is not a download.
 		if ( ! is_resource( $this->download_handle ) ) {
 			return $settings;
@@ -137,6 +149,11 @@ class Client extends \Sabre\DAV\Client {
 	 * @throws ClientException If the request failed (e.g. if the server could not be reached or the file could not be written).
 	 */
 	protected function doRequest( RequestInterface $request ): ResponseInterface {
+		// use the handling for uploads with a stream as body.
+		if ( is_resource( $request->getBody() ) ) {
+			return $this->do_stream_upload( $request );
+		}
+
 		// use the original handling, if this is not a download.
 		if ( ! is_resource( $this->download_handle ) ) {
 			return parent::doRequest( $request );
@@ -160,6 +177,64 @@ class Client extends \Sabre\DAV\Client {
 
 		// return the response with the headers of the last response (e.g. after an authentication challenge).
 		return new Response( $status, $this->get_download_headers() );
+	}
+
+	/**
+	 * Run a request with a stream as body (e.g. the upload of a file during the export).
+	 *
+	 * If the client negotiates the authentication with the server (e.g. for Basic and Digest auth, which is the
+	 * default of Sabre), curl first sends the request without credentials and must send the body again after the
+	 * challenge of the server. This is not possible with a stream in PHP and fails with "necessary data rewind
+	 * wasn't possible". Therefore, the credentials are sent directly via Basic auth for HTTPS connections, so the
+	 * stream is sent only once. If the server does not accept this (e.g. as it only supports Digest auth) or the
+	 * connection does not use HTTPS, the body is loaded into memory and sent with the negotiation, like before.
+	 *
+	 * @param RequestInterface $request The request.
+	 *
+	 * @return ResponseInterface
+	 * @throws ClientException If the request failed.
+	 */
+	private function do_stream_upload( RequestInterface $request ): ResponseInterface {
+		// get the stream.
+		$body = $request->getBody();
+
+		// get the settings of the client (the property is named by Sabre).
+		$curl_settings = $this->curlSettings; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+
+		// get the authentication methods.
+		$auth_methods = isset( $curl_settings[ CURLOPT_HTTPAUTH ] ) ? absint( $curl_settings[ CURLOPT_HTTPAUTH ] ) : CURLAUTH_BASIC;
+
+		// use the original handling, if no negotiation of the authentication is necessary.
+		if ( ! is_resource( $body ) || empty( $curl_settings[ CURLOPT_USERPWD ] ) || CURLAUTH_BASIC === $auth_methods ) {
+			return parent::doRequest( $request );
+		}
+
+		// send the credentials directly via Basic auth, if this is allowed and the connection uses HTTPS.
+		$position = ftell( $body );
+		if ( ( $auth_methods & CURLAUTH_BASIC ) && str_starts_with( strtolower( $request->getUrl() ), 'https://' ) ) {
+			$this->preemptive_basic_auth = true;
+			try {
+				$response = parent::doRequest( $request );
+			} finally {
+				$this->preemptive_basic_auth = false;
+			}
+
+			// return the response, if the server accepted the credentials.
+			if ( 401 !== $response->getStatus() ) {
+				return $response;
+			}
+
+			// return the response, if the stream could not be used again.
+			if ( false === $position || 0 !== fseek( $body, $position ) ) {
+				return $response;
+			}
+		}
+
+		// load the body into memory, so curl could send it again during the negotiation of the authentication.
+		$request->setBody( (string) stream_get_contents( $body ) );
+
+		// run the request with the original handling.
+		return parent::doRequest( $request );
 	}
 
 	/**

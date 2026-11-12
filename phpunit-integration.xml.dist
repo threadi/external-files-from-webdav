@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<phpunit
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
+        bootstrap="tests/bootstrap.php"
+        colors="true"
+        convertDeprecationsToExceptions="true"
+>
+    <testsuites>
+        <testsuite name="integration">
+            <directory suffix=".php">./tests/Integration/</directory>
+        </testsuite>
+    </testsuites>
+    <groups>
+        <!-- tests for known bugs, which are not fixed yet. Run them with the option "group known-bug" of PHPUnit. -->
+        <exclude>
+            <group>known-bug</group>
+        </exclude>
+    </groups>
+</phpunit>

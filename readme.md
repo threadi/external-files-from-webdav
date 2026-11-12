@@ -110,6 +110,14 @@ The tests do not connect to any WebDAV server: all WebDAV and HTTP requests are 
 
 `composer test-multisite`
 
+### Integration tests
+
+Besides the unit tests, there are integration tests against a real WebDAV server of Sabre in _tests/Integration/_. The tests start the server themselves with the built-in web server of PHP behind a small TLS proxy with a self-signed certificate, which requires `python3`:
+
+`composer test-integration`
+
+Without `python3` the tests are skipped. With the environment variable `EFMLWD_INTEGRATION_REQUIRED=1` they fail instead. The GitHub workflow "Integration tests" runs them automatically for each pull request.
+
 ## Check with the plugin "Plugin Check"
 
 `wp plugin check --error-severity=7 --warning-severity=6 --include-low-severity-errors --categories=plugin_repo --format=json --slug=external-files-in-media-library .`

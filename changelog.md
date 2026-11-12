@@ -10,6 +10,9 @@
 - Added support for the folder structure of exported files, missing folders are created (requires External Files in Media Library 6.0.0)
 - Added support for private files (requires External Files in Media Library 6.0.0): files are delivered via the cache of the proxy, which loads them with the credentials of the external source
 - Added support for the connection test in the directory listing (requires External Files in Media Library 6.0.0)
+- Added integration tests against a real WebDAV server of Sabre and a GitHub workflow for them
+- Directories are imported file by file via the import of External Files in Media Library 6.0.0: also directories with tens of thousands of files, in the background if necessary
+- Added integration test for the import of a directory with 1,100 files
 
 ### Changed
 
@@ -17,7 +20,7 @@
 
 ### Fixed
 
-- Fixed high memory usage during the export of large files, they are now uploaded as stream
+- Fixed high memory usage during the export of large files, they are now uploaded as stream (for this the credentials are sent directly via Basic auth for HTTPS connections, otherwise or if the server requires another authentication method, files are loaded into memory as before)
 - Fixed high memory usage during the import of large files and their loading into the cache of the proxy, they are now saved directly into a local file
 - The cache of the proxy now loads files via the WebDAV client, so the settings via the hook "efmlwd_service_webdav_client" and the authentication methods of WebDAV (e.g. Digest) are used for it too
 - Fixed WebDAV servers with a port in their URL (e.g. https://cloud.example.com:8443), the port was ignored for all requests

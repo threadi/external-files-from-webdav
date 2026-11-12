@@ -101,11 +101,13 @@ class Protocol extends Protocol_Base {
 	}
 
 	/**
-	 * Return infos to each given URL.
+	 * Return the data for the requests to the WebDAV server for the URL of this object.
 	 *
-	 * @return array<int|string,array<string,mixed>> List of files with its infos.
+	 * Adds an error to the results, if the URL is faulty.
+	 *
+	 * @return array{domain: string, path: string, settings: array<string,string>, fields: array<string,array<string,mixed>>}|false
 	 */
-	public function get_url_infos(): array {
+	private function get_request_data(): array|false {
 		$directory = $this->get_url();
 
 		// get the staring directory.
@@ -123,7 +125,7 @@ class Protocol extends Protocol_Base {
 			Results::get_instance()->add( $error_obj );
 
 			// do nothing more.
-			return array();
+			return false;
 		}
 
 		// set the requested domain.
@@ -162,6 +164,129 @@ class Protocol extends Protocol_Base {
 		 * @param string $directory The requested URL.
 		 */
 		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
+
+		// return the data.
+		return array(
+			'domain'   => $domain,
+			'path'     => $path,
+			'settings' => $settings,
+			'fields'   => $fields,
+		);
+	}
+
+	/**
+	 * Return whether this protocol could list the files of a directory page by page.
+	 *
+	 * @return bool
+	 */
+	public function supports_file_list(): bool {
+		return true;
+	}
+
+	/**
+	 * Return whether the URL of this object is a directory (a URL with a trailing slash).
+	 *
+	 * Directories without trailing slash are still imported with all files in one request.
+	 *
+	 * @return bool
+	 */
+	public function is_directory(): bool {
+		// get the path.
+		$path = wp_parse_url( $this->get_url(), PHP_URL_PATH );
+
+		// return whether it is the root or ends with a slash.
+		return ! is_string( $path ) || '' === $path || str_ends_with( $path, '/' );
+	}
+
+	/**
+	 * Return one page of the files in the directory of the URL of this object.
+	 *
+	 * Like the import of a directory, only the files directly in the directory are used. WebDAV returns the
+	 * complete list of a directory with one request, which is loaded only once per request.
+	 *
+	 * @param string $cursor The cursor for the requested page.
+	 *
+	 * @return array{files: array<int,array{url: string, media-url?: string, filesize?: int, last-modified?: int}>, cursor: string}|false
+	 */
+	public function get_file_list( string $cursor ): array|false {
+		// get the complete list of the directory, loaded once per request.
+		$files = $this->get_cached_file_list(
+			function () {
+				// get the data for the request.
+				$request_data = $this->get_request_data();
+
+				// bail if URL is faulty.
+				if ( false === $request_data ) {
+					return false;
+				}
+
+				// get the list of the directory.
+				try {
+					$client         = WebDav::get_instance()->get_client( $request_data['settings'], $request_data['domain'], $this->get_url() );
+					$directory_list = $client->propFind( '', array( '{DAV:}resourcetype', '{DAV:}getcontentlength', '{DAV:}getlastmodified' ), 1 );
+				} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+					Log::get_instance()->create( __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $this->get_url(), 'error', 0, Import::get_instance()->get_identifier() );
+					return false;
+				}
+
+				// collect the files.
+				$files = array();
+				foreach ( $directory_list as $file_name => $setting ) {
+					// bail if this is not a file (e.g. the directory itself or a subdirectory).
+					if ( ! is_null( $setting['{DAV:}resourcetype'] ?? null ) ) {
+						continue;
+					}
+
+					$false = false;
+					/** This filter is documented in app/WebDav/Protocol.php */
+					if ( apply_filters( 'efmlwd_service_webdav_hide_file', $false, $request_data['settings'], $file_name ) ) {
+						continue;
+					}
+
+					// add the file.
+					$files[] = array(
+						'url'           => $request_data['domain'] . $file_name,
+						'filesize'      => absint( $setting['{DAV:}getcontentlength'] ?? 0 ),
+						'last-modified' => absint( strtotime( (string) ( $setting['{DAV:}getlastmodified'] ?? '' ) ) ),
+					);
+				}
+
+				// return the list.
+				return $files;
+			},
+			'' === $cursor
+		);
+
+		// bail on errors.
+		if ( false === $files ) {
+			return false;
+		}
+
+		// return the requested page.
+		return $this->get_file_list_page( $files, $cursor );
+	}
+
+	/**
+	 * Return infos to each given URL.
+	 *
+	 * @return array<int|string,array<string,mixed>> List of files with its infos.
+	 */
+	public function get_url_infos(): array {
+		$directory = $this->get_url();
+
+		// get the data for the request.
+		$request_data = $this->get_request_data();
+
+		// bail if URL is faulty.
+		if ( false === $request_data ) {
+			return array();
+		}
+
+		// get the data.
+		$domain   = $request_data['domain'];
+		$path     = $request_data['path'];
+		$settings = $request_data['settings'];
+		$fields   = $request_data['fields'];
 
 		// get WP Filesystem-handler.
 		$wp_filesystem = Helper::get_wp_filesystem();
