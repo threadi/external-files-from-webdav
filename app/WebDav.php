@@ -31,6 +31,7 @@ use ExternalFilesInMediaLibrary\Services\Service;
 use ExternalFilesInMediaLibrary\Services\Service_Base;
 use Sabre\DAV\Client;
 use Error;
+use Exception;
 use WP_Error;
 use WP_User;
 
@@ -1149,5 +1150,154 @@ class WebDav extends Service_Base implements Service {
 
 		// set filter to enabled unsafe URL.
 		add_filter( 'http_request_args', array( $this, 'disable_check_for_unsafe_urls' ), 10, 2 );
+	}
+
+	/**
+	 * Return whether this service supports the complete connection test (requires External Files in Media Library 6.0.0).
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_connection_test(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the client and the URL of the directory for the connection test.
+	 *
+	 * The directory is the actual directory of the listing or the main directory of the connection, the same
+	 * way the directory listing determines it.
+	 *
+	 * @return array{client: Client, url: string}
+	 * @throws Exception If the URL could not be used.
+	 */
+	private function get_connection_test_client(): array {
+		// get the directory.
+		$directory = $this->get_connection_test_directory();
+		if ( ! str_starts_with( $directory, 'http://' ) && ! str_starts_with( $directory, 'https://' ) ) {
+			$directory = $this->get_directory();
+		}
+
+		// get the parts of the URL.
+		$parse_url = wp_parse_url( $directory );
+
+		// bail if scheme or host is not found.
+		if ( ! is_array( $parse_url ) || ! isset( $parse_url['scheme'], $parse_url['host'] ) ) {
+			throw new Exception( esc_html__( 'No credentials set for this WebDAV connection!', 'external-files-from-webdav' ) );
+		}
+
+		// get the fields and the domain.
+		$fields = $this->get_fields();
+		$domain = $this->get_domain_of_url( $parse_url );
+
+		// get the path like the directory listing does it.
+		$path = isset( $parse_url['path'] ) && '/' !== $parse_url['path'] ? $parse_url['path'] : '';
+
+		/** This filter is documented in app/WebDav.php */
+		$path = apply_filters( 'efmlwd_service_webdav_path', $path, $fields, $domain, $directory );
+
+		// create the settings for the client with the directory as base.
+		$url      = $domain . '/' . trim( $path, '/' ) . ( '' !== trim( $path, '/' ) ? '/' : '' );
+		$settings = array(
+			'baseUri'  => $url,
+			'userName' => $fields['login']['value'],
+			'password' => $fields['password']['value'],
+		);
+
+		/** This filter is documented in app/WebDav.php */
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
+
+		// return the client and the URL.
+		return array(
+			'client' => $this->get_client( $settings, $domain, $directory ),
+			'url'    => $url,
+		);
+	}
+
+	/**
+	 * Connect to WebDAV and list the directory for the connection test.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return string
+	 * @throws Exception If the step failed.
+	 */
+	protected function test_connection_list(): string {
+		// get the client.
+		$connection = $this->get_connection_test_client();
+
+		// list the directory.
+		try {
+			$connection['client']->propFind( '', array( '{DAV:}resourcetype' ), 1 );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			Log::get_instance()->create( __( 'The directory could not be read on WebDAV. Error:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $connection['url'], 'error' );
+			throw new Exception( esc_html__( 'The directory could not be read on WebDAV. Check the server, the path and the credentials.', 'external-files-from-webdav' ) );
+		}
+
+		// return the message.
+		return __( 'The directory could be read.', 'external-files-from-webdav' );
+	}
+
+	/**
+	 * Upload the test file to WebDAV.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param string $local_file The absolute path to the local test file.
+	 * @param string $file_name  The name of the test file.
+	 *
+	 * @return string
+	 * @throws Exception If the step failed.
+	 */
+	protected function test_connection_upload( string $local_file, string $file_name ): string {
+		// get the client.
+		$connection = $this->get_connection_test_client();
+
+		// upload the file.
+		try {
+			$result = $connection['client']->request( 'PUT', rawurlencode( $file_name ), (string) Helper::get_wp_filesystem()->get_contents( $local_file ) );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			Log::get_instance()->create( __( 'The test file could not be uploaded to WebDAV. Error:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $connection['url'], 'error' );
+			throw new Exception( esc_html__( 'The test file could not be uploaded to WebDAV. Check the permissions of the directory.', 'external-files-from-webdav' ) );
+		}
+
+		// bail if the WebDAV server returns an unexpected status.
+		if ( absint( $result['statusCode'] ) < 200 || absint( $result['statusCode'] ) >= 300 ) {
+			/* translators: %1$d will be replaced by an HTTP status like 403. */
+			throw new Exception( esc_html( sprintf( __( 'The test file could not be uploaded to WebDAV. The server returns with HTTP status %1$d.', 'external-files-from-webdav' ), absint( $result['statusCode'] ) ) ) );
+		}
+
+		// return the URL of the file.
+		return $connection['url'] . rawurlencode( $file_name );
+	}
+
+	/**
+	 * Delete the test file on WebDAV.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param string $url       The URL of the uploaded file.
+	 * @param string $file_name The name of the test file.
+	 *
+	 * @return void
+	 * @throws Exception If the step failed.
+	 */
+	protected function test_connection_delete( string $url, string $file_name ): void {
+		// get the client.
+		$connection = $this->get_connection_test_client();
+
+		// delete the file.
+		try {
+			$result = $connection['client']->request( 'DELETE', rawurlencode( $file_name ) );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			Log::get_instance()->create( __( 'The test file could not be deleted on WebDAV. Error:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $connection['url'], 'error' );
+			throw new Exception( esc_html__( 'The test file could not be deleted on WebDAV.', 'external-files-from-webdav' ) );
+		}
+
+		// bail if the WebDAV server returns an unexpected status.
+		if ( absint( $result['statusCode'] ) < 200 || absint( $result['statusCode'] ) >= 300 ) {
+			throw new Exception( esc_html__( 'The test file could not be deleted on WebDAV.', 'external-files-from-webdav' ) );
+		}
 	}
 }

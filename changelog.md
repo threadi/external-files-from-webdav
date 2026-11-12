@@ -9,6 +9,7 @@
 - Added documentation for the constants in docs/constants.md
 - Added support for the folder structure of exported files, missing folders are created (requires External Files in Media Library 6.0.0)
 - Added support for private files (requires External Files in Media Library 6.0.0): files are delivered via the cache of the proxy, which loads them with the credentials of the external source
+- Added support for the connection test in the directory listing (requires External Files in Media Library 6.0.0)
 
 ### Changed
 
