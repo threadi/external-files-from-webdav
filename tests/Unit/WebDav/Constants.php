@@ -41,7 +41,7 @@ class Constants extends externalFilesFromWebDavTests {
 
 		// bail if the main plugin does not support constants.
 		if ( ! method_exists( WebDav::get_instance(), 'get_constant_values' ) ) {
-			$this->markTestSkipped( 'Requires "External Files in Media Library" 5.7.0 or newer.' );
+			$this->markTestSkipped( 'Requires "External Files in Media Library" 6.0.0 or newer.' );
 		}
 
 		// use a unique prefix for the constants of this test.

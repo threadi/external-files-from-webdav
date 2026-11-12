@@ -49,7 +49,7 @@ class WebDav extends Service_Base implements Service {
 	 * Name of the field, which contains the URL of the server.
 	 *
 	 * If the credentials are defined via constants, they are only used for this server.
-	 * Requires "External Files in Media Library" 5.7.0 or newer.
+	 * Requires "External Files in Media Library" 6.0.0 or newer.
 	 *
 	 * @var string
 	 */
@@ -346,7 +346,7 @@ class WebDav extends Service_Base implements Service {
 		$fields = $this->get_fields();
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = $this->get_domain_of_url( $parse_url );
 
 		// create settings array for request.
 		$settings = array(
@@ -645,6 +645,36 @@ class WebDav extends Service_Base implements Service {
 	}
 
 	/**
+	 * Return the domain of the given parsed URL with scheme, host and port (if set).
+	 *
+	 * The port is required for WebDAV servers, which are not reachable via the default port of their scheme
+	 * (e.g. "https://cloud.example.com:8443").
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param array<string,mixed> $parse_url The parsed URL (e.g. from "wp_parse_url()").
+	 *
+	 * @return string
+	 */
+	public function get_domain_of_url( array $parse_url ): string {
+		// bail if scheme or host are missing.
+		if ( empty( $parse_url['scheme'] ) || empty( $parse_url['host'] ) ) {
+			return '';
+		}
+
+		// create the domain with scheme and host.
+		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+
+		// add the port, if set.
+		if ( ! empty( $parse_url['port'] ) ) {
+			$domain .= ':' . absint( $parse_url['port'] );
+		}
+
+		// return the resulting domain.
+		return $domain;
+	}
+
+	/**
 	 * Return a new sabre client object for given settings.
 	 *
 	 * @param array<string,string> $settings The settings for the client.
@@ -654,8 +684,8 @@ class WebDav extends Service_Base implements Service {
 	 * @return Client
 	 */
 	public function get_client( array $settings, string $domain, string $directory ): Client {
-		// get the file contents.
-		$client = new Client( $settings );
+		// get the client, which could also save downloads directly into files.
+		$client = new WebDav\Client( $settings );
 		$client->setThrowExceptions( true );
 
 		/**
@@ -670,6 +700,48 @@ class WebDav extends Service_Base implements Service {
 		 * @param string $directory The requested URL.
 		 */
 		return apply_filters( 'efmlwd_service_webdav_client', $client, $domain, $directory );
+	}
+
+	/**
+	 * Download the file of the base URI of the given client into the given local file.
+	 *
+	 * The file is not loaded completely into memory, if the client of this plugin is used. If the client
+	 * has been replaced via the hook "efmlwd_service_webdav_client" by another client, the file is loaded
+	 * with this client as before.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param Client $client The client to use.
+	 * @param string $file   The absolute path to the local file.
+	 *
+	 * @return void
+	 * @throws \Sabre\HTTP\ClientException If the file could not be loaded.
+	 * @throws \Sabre\HTTP\ClientHttpException If the WebDAV server returns an error.
+	 */
+	public function download_file( Client $client, string $file ): void {
+		// use the download into the file, if our client is used.
+		if ( $client instanceof WebDav\Client ) {
+			$response = $client->download_to_file( '', $file );
+
+			// bail if the WebDAV server returns an error (e.g. if exceptions are disabled via hook).
+			if ( $response->getStatus() < 200 || $response->getStatus() >= 300 ) {
+				throw new \Sabre\HTTP\ClientHttpException( $response ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+
+			// do nothing more.
+			return;
+		}
+
+		// get the file with the given client.
+		$file_data = $client->request( 'GET' );
+
+		// bail if the WebDAV server returns an error.
+		if ( absint( $file_data['statusCode'] ) < 200 || absint( $file_data['statusCode'] ) >= 300 ) {
+			throw new \Sabre\HTTP\ClientException( 'WebDAV returns the HTTP status ' . absint( $file_data['statusCode'] ) . '.' );
+		}
+
+		// save the content.
+		Helper::get_wp_filesystem()->put_contents( $file, $file_data['body'] );
 	}
 
 	/**
@@ -858,7 +930,7 @@ class WebDav extends Service_Base implements Service {
 	 * @return array<string,mixed>
 	 */
 	public function get_fields_for_url( array $fields, string $url ): array {
-		// bail if the main plugin does not support constants (requires "External Files in Media Library" 5.7.0 or newer).
+		// bail if the main plugin does not support constants (requires "External Files in Media Library" 6.0.0 or newer).
 		if ( ! method_exists( $this, 'apply_constants_to_fields' ) ) { // @phpstan-ignore function.alreadyNarrowedType
 			return $fields;
 		}
@@ -877,7 +949,7 @@ class WebDav extends Service_Base implements Service {
 	 * @return bool True if the hint has been added, false if the setting should be added.
 	 */
 	protected function show_constant_hint( Section $section, string $field_name, string $title ): bool {
-		// bail if the main plugin does not support this (requires "External Files in Media Library" 5.7.0 or newer).
+		// bail if the main plugin does not support this (requires "External Files in Media Library" 6.0.0 or newer).
 		if ( ! method_exists( $this, 'add_constant_hint_setting' ) ) { // @phpstan-ignore function.alreadyNarrowedType
 			return false;
 		}

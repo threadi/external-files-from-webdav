@@ -2,7 +2,7 @@
 
 You can define the credentials of WebDAV as constants, e.g. in your `wp-config.php`. This keeps them out of the database and out of database backups, and allows different values per environment.
 
-Requires _External Files in Media Library_ 5.7.0 or newer. See also the [documentation of the main plugin](https://github.com/threadi/external-files-in-media-library/blob/master/docs/constants.md).
+Requires _External Files in Media Library_ 6.0.0 or newer. See also the [documentation of the main plugin](https://github.com/threadi/external-files-in-media-library/blob/master/docs/constants.md).
 
 ## How it works
 
@@ -22,3 +22,5 @@ define( 'EFML_WEBDAV_LOGIN', 'your-login' );
 define( 'EFML_WEBDAV_PASSWORD', 'your-password' );
 define( 'EFML_WEBDAV_PATH', '/remote.php/dav/files/' ); // optional
 ```
+
+If your WebDAV server does not use the default port, add it to the server, e.g. `https://nextcloud.example.com:8443`. The comparison with the server of a URL only uses the host name.

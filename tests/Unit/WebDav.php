@@ -594,4 +594,47 @@ class WebDav extends externalFilesFromWebDavTests {
 		$this->assertStringContainsString( 'id="efml-webdav"', $output );
 		$this->assertStringContainsString( 'efml-user-settings', $output );
 	}
+
+	/**
+	 * Test the domain of URLs with and without port.
+	 *
+	 * @return void
+	 */
+	public function test_get_domain_of_url(): void {
+		$webdav = \ExternalFilesFromWebDav\WebDav::get_instance();
+		$this->assertEquals( 'https://webdav.example.com', $webdav->get_domain_of_url( (array) wp_parse_url( 'https://webdav.example.com/remote.php/dav/' ) ) );
+		$this->assertEquals( 'https://webdav.example.com:8443', $webdav->get_domain_of_url( (array) wp_parse_url( 'https://webdav.example.com:8443/remote.php/dav/' ) ) );
+		$this->assertEquals( 'http://[::1]:8080', $webdav->get_domain_of_url( (array) wp_parse_url( 'http://[::1]:8080/dav/' ) ) );
+		$this->assertEquals( '', $webdav->get_domain_of_url( (array) wp_parse_url( 'webdav.example.com/dav/' ) ) );
+	}
+
+	/**
+	 * Test the directory listing of a WebDAV server with port.
+	 *
+	 * @return void
+	 */
+	public function test_get_directory_listing_with_port(): void {
+		$domain = $this->domain . ':8443';
+		$webdav = $this->get_webdav_with_fields();
+		add_filter( 'efmlwd_service_webdav_path', array( $webdav, 'set_path' ), 10, 2 );
+
+		$this->add_webdav_response(
+			'PROPFIND',
+			$domain . '/remote.php/dav/files/user/',
+			207,
+			$this->get_propfind_body(
+				array(
+					'/remote.php/dav/files/user/'             => array( 'dir' => true ),
+					'/remote.php/dav/files/user/example.jpg'  => array( 'size' => 706, 'type' => 'image/jpeg' ),
+					'/remote.php/dav/files/user/My%20Photos/' => array( 'dir' => true ),
+				)
+			)
+		);
+
+		$listing = $webdav->get_directory_listing( $domain );
+
+		$this->assertEquals( $domain . '/remote.php/dav/files/user/', $this->get_webdav_requests()[0]['url'] );
+		$this->assertEquals( $domain . '/remote.php/dav/files/user/example.jpg', $listing['files'][0]['file'] );
+		$this->assertEquals( array( $domain . '/remote.php/dav/files/user/My%20Photos/' ), array_keys( $listing['dirs'] ) );
+	}
 }

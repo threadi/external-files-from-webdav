@@ -3,10 +3,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: External files from Google Drive in Media Library 1.0.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/external-files-"
-"from-webdav\n"
-"POT-Creation-Date: 2026-10-24T11:43:02+00:00\n"
-"PO-Revision-Date: 2026-10-24 13:44+0200\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/external-files-from-webdav\n"
+"POT-Creation-Date: 2026-11-12T15:00:00+00:00\n"
+"PO-Revision-Date: 2026-11-12 16:00+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: de_DE\n"
@@ -14,8 +13,8 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.8\n"
 "X-Domain: external-files-from-webdav\n"
+"X-Generator: Poedit 3.8\n"
 
 #. Plugin Name of the plugin
 #: external-files-from-webdav.php
@@ -25,8 +24,7 @@ msgstr "Externe Dateien aus WebDav in der Mediathek"
 #. Description of the plugin
 #: external-files-from-webdav.php
 msgid "Extends External files in Media Library for use with WebDav."
-msgstr ""
-"Erweitert Externe Dateien in der Mediathek für die Verwendung von WebDav."
+msgstr "Erweitert Externe Dateien in der Mediathek für die Verwendung von WebDav."
 
 #. Author of the plugin
 #: external-files-from-webdav.php
@@ -43,248 +41,222 @@ msgid "Use only WebDav"
 msgstr "Verwende nur WebDav"
 
 #: app/Plugin/Configuration.php:50
+msgid "After that, you will only be able to see and use WebDav for external sources."
+msgstr "Danach können Sie WebDAV nur noch für externe Quellen anzeigen und nutzen."
+
+#: app/Plugin/Configuration.php:50
 msgid "This will disable all other services except WebDav."
 msgstr "Dadurch werden alle anderen Dienste außer WebDAV deaktiviert."
 
-#: app/Plugin/Configuration.php:50
-msgid ""
-"After that, you will only be able to see and use WebDav for external sources."
-msgstr ""
-"Danach können Sie WebDAV nur noch für externe Quellen anzeigen und nutzen."
-
-#: app/WebDav.php:119
+#: app/WebDav.php:129
 msgid "Choose file(s) from your WebDAV"
 msgstr "Wähle Datei(en) von deinem WebDav"
 
-#: app/WebDav.php:192 app/WebDav.php:709
+#: app/WebDav.php:197 app/WebDav.php:204 app/WebDav.php:778
 msgid "WebDAV Server"
 msgstr "WebDAV Server"
 
-#: app/WebDav.php:193 app/WebDav.php:711
+#: app/WebDav.php:205 app/WebDav.php:780
 msgid "https://nextcloud.local"
 msgstr "https://nextcloud.local"
 
-#: app/WebDav.php:204 app/WebDav.php:714 app/WebDav.php:764
+#: app/WebDav.php:210 app/WebDav.php:219 app/WebDav.php:783 app/WebDav.php:833
 msgid "Login"
 msgstr "Login"
 
-#: app/WebDav.php:205 app/WebDav.php:716 app/WebDav.php:765
+#: app/WebDav.php:220 app/WebDav.php:785 app/WebDav.php:834
 msgid "Your login"
 msgstr "Dein Login"
 
-#: app/WebDav.php:216 app/WebDav.php:719 app/WebDav.php:773
+#: app/WebDav.php:225 app/WebDav.php:234 app/WebDav.php:788 app/WebDav.php:842
 msgid "Password"
 msgstr "Passwort"
 
-#: app/WebDav.php:217 app/WebDav.php:721 app/WebDav.php:774
+#: app/WebDav.php:235 app/WebDav.php:790 app/WebDav.php:843
 msgid "Your password"
 msgstr "Dein Passwort"
 
-#: app/WebDav.php:226 app/WebDav.php:724 app/WebDav.php:782
+#: app/WebDav.php:240 app/WebDav.php:247 app/WebDav.php:793 app/WebDav.php:851
 msgid "Path"
 msgstr "Pfad"
 
-#: app/WebDav.php:227 app/WebDav.php:726
-msgid ""
-"Define the path added after the WebDAV-domain to load files. For Nextcloud-"
-"based WebDAV this is <code>/remote.php/dav/files/</code>."
-msgstr ""
-"Gibt den Pfad nach der WebDav-Domain an um Dateien zu laden. Für Nextcloud-"
-"basiertes WebDAV ist das <code>/remote.php/dav/files/</code>."
+#: app/WebDav.php:248 app/WebDav.php:795
+msgid "Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>."
+msgstr "Gibt den Pfad nach der WebDav-Domain an um Dateien zu laden. Für Nextcloud-basiertes WebDAV ist das <code>/remote.php/dav/files/</code>."
 
-#: app/WebDav.php:238
+#: app/WebDav.php:260
 msgid "Hint"
 msgstr "Hinweis"
 
 #. translators: %1$s will be replaced by a URL.
-#: app/WebDav.php:240
+#: app/WebDav.php:262
 #, php-format
-msgid ""
-"Each user will find its settings in his own <a href=\"%1$s\">user profile</"
-"a>."
-msgstr ""
-"Jeder Benutzer findet seine Einstellungen in seinem eigenem <a "
-"href=\"%1$s\">Benutzerprofil</a>."
+msgid "Each user will find its settings in his own <a href=\"%1$s\">user profile</a>."
+msgstr "Jeder Benutzer findet seine Einstellungen in seinem eigenem <a href=\"%1$s\">Benutzerprofil</a>."
 
-#: app/WebDav.php:250
+#: app/WebDav.php:272
 msgid "Ignore self-signed SSL-certificates"
 msgstr "Ignoriere selbst signierte SSL-Zertifikate"
 
-#: app/WebDav.php:251
+#: app/WebDav.php:273
 msgid "If enabled self-signed certificates will be acknowledged."
 msgstr "Wenn aktiviert werden selbst signierte SSL-Zertifikate angenommen."
 
-#: app/WebDav.php:302
+#: app/WebDav.php:324
 msgid "Given URL is not an HTTP-URL. The URL:"
 msgstr "Angegebene URL ist keine HTTP-URL. Die URL:"
 
-#: app/WebDav.php:316
+#: app/WebDav.php:338
 msgid "Given URL could not be analysed."
 msgstr "Die URL konnte nicht analysiert werden."
 
-#: app/WebDav.php:376 app/WebDav.php:383 app/WebDav/Protocol.php:183
-#: app/WebDav/Protocol.php:426
+#: app/WebDav.php:398 app/WebDav.php:405 app/WebDav/Protocol.php:182 app/WebDav/Protocol.php:422
 msgid "The following error occurred:"
 msgstr "Der folgende Fehler trat auf:"
 
-#: app/WebDav.php:383
+#: app/WebDav.php:405
 msgid "Domain:"
 msgstr "Domain:"
 
-#: app/WebDav.php:383
+#: app/WebDav.php:405
 msgid "Path:"
 msgstr "Pfad:"
 
-#: app/WebDav.php:383
+#: app/WebDav.php:405
 msgid "Settings:"
 msgstr "Einstellungen:"
 
-#: app/WebDav.php:520
+#: app/WebDav.php:542
 msgid "Import"
 msgstr "Importieren"
 
-#: app/WebDav.php:522
+#: app/WebDav.php:544
 msgid "File-type is not supported"
 msgstr "Der Dateityp wird nicht unterstützt"
 
-#: app/WebDav.php:538
+#: app/WebDav.php:560
 msgid "Save active directory as your external source"
 msgstr "Speicher aktuelles Verzeichnis als externe Quelle"
 
-#: app/WebDav.php:689
+#: app/WebDav.php:758
 msgid "WebDav"
 msgstr "WebDav"
 
-#: app/WebDav.php:756
+#: app/WebDav.php:825
 msgid "Server"
 msgstr "WebDav"
 
-#: app/WebDav.php:757
+#: app/WebDav.php:826
 msgid "https://example.com"
 msgstr "https://example.com"
 
-#: app/WebDav.php:783
+#: app/WebDav.php:852
 msgid "/remote.php/dav/files/"
 msgstr "/remote.php/dav/files/"
 
-#: app/WebDav.php:817
+#: app/WebDav.php:939
 msgid "Connect to your WebDAV"
 msgstr "Verbinde zu deinem WebDAV"
 
-#: app/WebDav.php:821
+#: app/WebDav.php:943
 msgid "Enter your credentials"
 msgstr "Gibt deine Zugangsdaten ein"
 
-#: app/WebDav.php:836
-msgid ""
-"The credentials have already been set by an administrator in the plugin "
-"settings. Just connect for show the files."
-msgstr ""
-"Ein Zugriffstoken wurde bereits von einem Administrator in den Plugin-"
-"Einstellungen festgelegt. Stelle einfach eine Verbindung her, um die Dateien "
-"anzuzeigen."
+#: app/WebDav.php:958
+msgid "The credentials have already been set by an administrator in the plugin settings. Just connect for show the files."
+msgstr "Ein Zugriffstoken wurde bereits von einem Administrator in den Plugin-Einstellungen festgelegt. Stelle einfach eine Verbindung her, um die Dateien anzuzeigen."
 
-#: app/WebDav.php:840
+#: app/WebDav.php:962
 msgid "The credentials must be set by an administrator in the plugin settings."
-msgstr ""
-"Die Zugangsdaten müssen von einem Administrator in den Plugin-Einstellungen "
-"festgelegt werden."
+msgstr "Die Zugangsdaten müssen von einem Administrator in den Plugin-Einstellungen festgelegt werden."
 
 #. translators: %1$s will be replaced by a URL.
-#: app/WebDav.php:845
+#: app/WebDav.php:967
 #, php-format
 msgid "Set your credentials <a href=\"%1$s\">here</a>."
 msgstr "Lege deine Zugangsdaten <a href=\"%1$s\">hier</a> fest."
 
 #. translators: %1$s will be replaced by a URL.
-#: app/WebDav.php:849
+#: app/WebDav.php:971
 #, php-format
-msgid ""
-"Your credentials are already set <a href=\"%1$s\">here</a>. Just connect for "
-"show the files."
-msgstr ""
-"Deine Zugangsdaten sind bereits <a href=\"%1$s\">hier</a> eingerichtet. "
-"Stelle einfach eine Verbindung her, um die Dateien anzuzeigen."
+msgid "Your credentials are already set <a href=\"%1$s\">here</a>. Just connect for show the files."
+msgstr "Deine Zugangsdaten sind bereits <a href=\"%1$s\">hier</a> eingerichtet. Stelle einfach eine Verbindung her, um die Dateien anzuzeigen."
 
 #. translators: %1$s will be replaced by a URL.
-#: app/WebDav.php:856
+#: app/WebDav.php:978
 #, php-format
 msgid "Set your credentials <a href=\"%1$s\">in your profile</a>."
 msgstr "Lege deine Zugangsdaten <a href=\"%1$s\">in deinem Profil</a> fest."
 
 #. translators: %1$s will be replaced by a URL.
-#: app/WebDav.php:860
+#: app/WebDav.php:982
 #, php-format
-msgid ""
-"Your credentials are already set <a href=\"%1$s\">in your profile</a>. Just "
-"connect for show the files."
-msgstr ""
-"Dein Zugriffstoken ist bereits <a href=\"%1$s\">in deinem Profil</a> "
-"festgelegt. Stelle einfach eine Verbindung her, um die Dateien anzuzeigen."
+msgid "Your credentials are already set <a href=\"%1$s\">in your profile</a>. Just connect for show the files."
+msgstr "Dein Zugriffstoken ist bereits <a href=\"%1$s\">in deinem Profil</a> festgelegt. Stelle einfach eine Verbindung her, um die Dateien anzuzeigen."
 
-#: app/WebDav.php:863
+#: app/WebDav.php:985
 msgid "Enter your WebDAV credentials in this form."
 msgstr "Gibt die Zugangsdaten zu deinem WebDAV in dem Formular ein."
 
-#: app/WebDav/Export.php:111
+#: app/WebDav/Export.php:113
 msgid "Could not load file path for given attachment ID."
-msgstr ""
-"Der Dateipfad für die angegebene Anhang-ID konnte nicht geladen werden."
+msgstr "Der Dateipfad für die angegebene Anhang-ID konnte nicht geladen werden."
 
-#: app/WebDav/Export.php:123
+#: app/WebDav/Export.php:125
 msgid "Given file does not exist:"
 msgstr "Die angegebene Datei existiert nicht:"
 
-#: app/WebDav/Export.php:137
+#: app/WebDav/Export.php:146
+msgid "Given file could not be opened for the export:"
+msgstr "Die Datei konnte für den Export nicht geöffnet werden:"
+
+#: app/WebDav/Export.php:157
 msgid "Error occurred during request to export a file to WebDav:"
-msgstr ""
-"Beim Versuch, eine Datei nach WebDAV zu exportieren, ist ein Fehler "
-"aufgetreten:"
+msgstr "Beim Versuch, eine Datei nach WebDAV zu exportieren, ist ein Fehler aufgetreten:"
 
-#: app/WebDav/Export.php:153
+#: app/WebDav/Export.php:176
 msgid "Got unsupported status code from WebDav during export of a file:"
-msgstr ""
-"Erhielte einen nicht unterstützten Status Code von WebDAV beim Exportieren "
-"einer Datei:"
+msgstr "Erhielte einen nicht unterstützten Status Code von WebDAV beim Exportieren einer Datei:"
 
-#: app/WebDav/Export.php:222
+#: app/WebDav/Export.php:245
 msgid "Error occurred during request to delete a file on WebDav:"
 msgstr "Fehler beim Löschen einer Datei vom WebDAV:"
 
-#: app/WebDav/Export.php:239
+#: app/WebDav/Export.php:262
 msgid "Got unsupported status code from WebDav during deletion of a file:"
-msgstr ""
-"Erhielt nicht unterstützten Status Code von WebDav während dem Löschen einer "
-"Datei:"
+msgstr "Erhielt nicht unterstützten Status Code von WebDav während dem Löschen einer Datei:"
 
-#: app/WebDav/Protocol.php:119 app/WebDav/Protocol.php:361
+#: app/WebDav/Export.php:351 app/WebDav/Export.php:357
+msgid "Error occurred during request to create a folder on WebDav:"
+msgstr "Beim Anlegen eines Ordners auf WebDAV ist ein Fehler aufgetreten:"
+
+#: app/WebDav/Export.php:366
+msgid "Got unsupported status code from WebDav during creation of a folder:"
+msgstr "WebDAV hat beim Anlegen eines Ordners mit einem nicht unterstützten Statuscode geantwortet:"
+
+#: app/WebDav/Protocol.php:118 app/WebDav/Protocol.php:357
 msgid "Got faulty URL."
 msgstr "Erhielt fehlerhafte URL."
 
-#: app/WebDav/Protocol.php:178 app/WebDav/Protocol.php:418
+#: app/WebDav/Protocol.php:177 app/WebDav/Protocol.php:414
 msgid "Error occurred during requesting the directory listing."
-msgstr ""
-"Beim Abrufen der Anmeldedatei für Google Cloud Storage ist ein Fehler "
-"aufgetreten."
+msgstr "Beim Abrufen der Anmeldedatei für Google Cloud Storage ist ein Fehler aufgetreten."
 
-#: app/WebDav/Protocol.php:192 app/WebDav/Protocol.php:436
+#: app/WebDav/Protocol.php:191 app/WebDav/Protocol.php:432
 msgid "Got empty response from WebDAV for given file."
 msgstr "Erhielt leere Antwort von WebDAV zur angegebenen Datei."
 
-#. translators: %1$d will be replaced by the number of failed files, %2$s by the list of errors.
-#: app/WebDav/Protocol.php:326
+#: app/WebDav/Protocol.php:244
+msgid "The given file already exist in your media library."
+msgstr "Die angegebene Datei existiert bereits in deiner Mediathek."
+
+#: app/WebDav/Protocol.php:323
 #, php-format
 msgid "%1$d file could not be loaded during WebDAV import:<br><br>%2$s"
 msgid_plural "%1$d files could not be loaded during WebDAV import:<br><br>%2$s"
-msgstr[0] ""
-"%1$d Datei konnte beim WebDAV-Import nicht geladen werden: <br><br>%2$s"
-msgstr[1] ""
-"%1$d Dateien konntem beim WebDAV-Import nicht geladen werden: <br><br>%2$s"
+msgstr[0] "%1$d Datei konnte beim WebDAV-Import nicht geladen werden: <br><br>%2$s"
+msgstr[1] "%1$d Dateien konntem beim WebDAV-Import nicht geladen werden: <br><br>%2$s"
 
-#, php-format
-#~ msgid ""
-#~ "Error occurred during requesting this file. Check the <a href=\"%1$s\" "
-#~ "target=\"_blank\">log</a> for detailed information."
-#~ msgstr ""
-#~ "Fehler bei Anfrage einer Datei. Prüfe das <a href=\"%1$s\" "
-#~ "target=\"_blank\">Protokoll</a> für mehr Details."
+#: app/WebDav/Protocol.php:547
+msgid "File could not be loaded from WebDAV:"
+msgstr "Die Datei konnte nicht von WebDAV geladen werden:"

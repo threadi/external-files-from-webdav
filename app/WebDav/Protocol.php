@@ -13,7 +13,6 @@ defined( 'ABSPATH' ) || exit;
 use ExternalFilesFromWebDav\WebDav;
 use ExternalFilesInMediaLibrary\ExternalFiles\Import;
 use ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base;
-use ExternalFilesInMediaLibrary\ExternalFiles\Protocols\Http;
 use ExternalFilesInMediaLibrary\ExternalFiles\Results;
 use ExternalFilesInMediaLibrary\ExternalFiles\Results\Url_Result;
 use ExternalFilesInMediaLibrary\Plugin\Helper;
@@ -128,7 +127,7 @@ class Protocol extends Protocol_Base {
 		}
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
 
 		// get the path.
 		$path = isset( $parse_url['path'] ) ? $parse_url['path'] : '';
@@ -293,11 +292,8 @@ class Protocol extends Protocol_Base {
 				// get a new client.
 				$client = WebDav::get_instance()->get_client( $settings, $domain, $directory );
 
-				// get the file data.
-				$file_data = $client->request( 'GET' );
-
-				// save the content.
-				$wp_filesystem->put_contents( $results['tmp-file'], $file_data['body'] );
+				// save the file directly into the tmp file.
+				WebDav::get_instance()->download_file( $client, $results['tmp-file'] );
 			} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
 				// clean up the tmp file.
 				$wp_filesystem->delete( $results['tmp-file'] );
@@ -370,7 +366,7 @@ class Protocol extends Protocol_Base {
 		}
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
 
 		// get the path.
 		$path = isset( $parse_url['path'] ) ? $parse_url['path'] : '';
@@ -512,11 +508,49 @@ class Protocol extends Protocol_Base {
 	 * @return bool|string
 	 */
 	public function get_temp_file( string $url, WP_Filesystem_Base $filesystem ): bool|string {
-		// get the HTTP protocol handler.
-		$http_protocol_handler = new Http( $url );
-		$http_protocol_handler->set_fields( $this->get_fields() );
+		// parse the URL.
+		$parse_url = wp_parse_url( $url );
 
-		// return the results from the HTTP handler.
-		return $http_protocol_handler->get_temp_file( $url, $filesystem );
+		// bail if scheme or host is not found in the URL.
+		if ( ! isset( $parse_url['scheme'], $parse_url['host'] ) ) {
+			return false;
+		}
+
+		// get the fields.
+		$fields = $this->get_fields();
+
+		// set the requested domain.
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
+
+		// create the settings for the client, like for the import of single files.
+		$settings = array(
+			'baseUri'  => $url,
+			'userName' => isset( $fields['login']['value'] ) ? (string) $fields['login']['value'] : '',
+			'password' => isset( $fields['password']['value'] ) ? (string) $fields['password']['value'] : '',
+		);
+
+		// get the tmp file.
+		$tmp_file = wp_tempnam();
+
+		// download the file via the WebDAV client, so the settings via hooks and the authentication methods of the client are used.
+		try {
+			// get a new client.
+			$client = WebDav::get_instance()->get_client( $settings, $domain, $url );
+
+			// save the file directly into the tmp file.
+			WebDav::get_instance()->download_file( $client, $tmp_file );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			// clean up the tmp file.
+			$filesystem->delete( $tmp_file );
+
+			// log this event.
+			Log::get_instance()->create( __( 'File could not be loaded from WebDAV:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $url, 'error' );
+
+			// return false as we got no file.
+			return false;
+		}
+
+		// return the tmp file.
+		return $tmp_file;
 	}
 }

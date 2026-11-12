@@ -4,10 +4,22 @@
 
 ### Added
 
-- Added possibility to define the credentials via constants, e.g. in wp-config.php (requires External Files in Media Library 5.7.0)
+- Added possibility to define the credentials via constants, e.g. in wp-config.php (requires External Files in Media Library 6.0.0)
 - Credentials from constants are only used for the server defined via constant, saved external sources on other servers are not usable then
 - Added documentation for the constants in docs/constants.md
-- Added support for the folder structure of exported files, missing folders are created (requires External Files in Media Library 5.7.0)
+- Added support for the folder structure of exported files, missing folders are created (requires External Files in Media Library 6.0.0)
+- Added support for private files (requires External Files in Media Library 6.0.0): files are delivered via the cache of the proxy, which loads them with the credentials of the external source
+
+### Changed
+
+- Updated German translations
+
+### Fixed
+
+- Fixed high memory usage during the export of large files, they are now uploaded as stream
+- Fixed high memory usage during the import of large files and their loading into the cache of the proxy, they are now saved directly into a local file
+- The cache of the proxy now loads files via the WebDAV client, so the settings via the hook "efmlwd_service_webdav_client" and the authentication methods of WebDAV (e.g. Digest) are used for it too
+- Fixed WebDAV servers with a port in their URL (e.g. https://cloud.example.com:8443), the port was ignored for all requests
 
 ## [1.1.0] - 24.10.2026
 

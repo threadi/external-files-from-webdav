@@ -280,4 +280,34 @@ class Export extends externalFilesFromWebDavTests {
 		$this->assertEquals( array(), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Photos/../2026/file.jpg', $credentials ) ) );
 		$this->assertEquals( array(), $this->call_method( $this->get_export(), 'get_folders_from_target', array( 'https://webdav.example.com/Photos/2026/file.jpg', array() ) ) );
 	}
+
+	/**
+	 * Test that WebDAV supports private files.
+	 *
+	 * @return void
+	 */
+	public function test_supports_private_files(): void {
+		$this->assertTrue( $this->get_export()->supports_private_files() );
+	}
+
+	/**
+	 * Test the export to a WebDAV server with port.
+	 *
+	 * @return void
+	 */
+	public function test_export_file_with_port(): void {
+		$domain        = 'https://webdav.example.com:8443';
+		$attachment_id = $this->create_local_attachment();
+		$file_name     = basename( (string) get_attached_file( $attachment_id, true ) );
+		$this->add_webdav_response( 'PUT', $domain . '/remote.php/dav/files/user/' . $file_name, 201 );
+
+		$url = $this->get_export()->export_file( $attachment_id, $this->get_target( $attachment_id, $domain ), $this->get_credentials() );
+
+		$this->assertEquals( $domain . '/remote.php/dav/files/user/' . $file_name, $url );
+		$this->assertCount( 1, $this->get_webdav_requests() );
+
+		// the file is deleted on the same server.
+		$this->add_webdav_response( 'DELETE', $url, 204 );
+		$this->assertTrue( $this->get_export()->delete_exported_file( $url, $this->get_credentials(), $attachment_id ) );
+	}
 }

@@ -81,7 +81,7 @@ class Export extends Export_Base {
 		$fields = $webdav_object->get_fields_for_url( $credentials['fields'], $target );
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
 
 		// create settings array for request.
 		$settings = array(
@@ -137,15 +137,30 @@ class Export extends Export_Base {
 			return false;
 		}
 
+		// open the file, so it is uploaded as stream and not loaded completely into memory.
+		$handle = fopen( $file_path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		// bail if the file could not be opened.
+		if ( false === $handle ) {
+			// log this event.
+			Log::get_instance()->create( __( 'Given file could not be opened for the export:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $file_path ) . '</code>', $target, 'error' );
+
+			// do nothing more.
+			return false;
+		}
+
 		// upload the file to the given path.
 		try {
-			$result = $client->request( 'PUT', $upload_path, (string) $wp_filesystem_local->get_contents( $file_path ) );
+			$result = $client->request( 'PUT', $upload_path, $handle );
 		} catch ( Exception $e ) {
 			// log this event.
 			Log::get_instance()->create( __( 'Error occurred during request to export a file to WebDav:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $target, 'error' );
 
 			// do nothing more.
 			return false;
+		} finally {
+			// close the file.
+			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		}
 
 		// list of allowed status codes.
@@ -196,7 +211,7 @@ class Export extends Export_Base {
 		$fields = $webdav_object->get_fields_for_url( $credentials['fields'], $directory );
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
 
 		// create settings array for request.
 		$settings = array(
@@ -382,5 +397,19 @@ class Export extends Export_Base {
 
 		// return the path with the base path.
 		return $base_path . $path;
+	}
+
+	/**
+	 * Return whether this service could save exported files privately.
+	 *
+	 * The files are saved like before. Private files are delivered via the proxy of External Files in Media Library
+	 * from its cache, which loads them with the credentials of the external source.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_private_files(): bool {
+		return true;
 	}
 }

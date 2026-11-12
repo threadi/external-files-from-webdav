@@ -347,7 +347,7 @@ class Protocol extends externalFilesFromWebDavTests {
 	public function test_get_url_info(): void {
 		$url = $this->domain . '/remote.php/dav/files/user/example.jpg';
 		$this->add_webdav_response( 'PROPFIND', $url, 207, $this->get_propfind_body( array( '/remote.php/dav/files/user/example.jpg' => array( 'size' => 706, 'type' => 'image/jpeg' ) ) ) );
-		$this->add_http_response( $url, 200, array( 'Content-Type' => 'image/jpeg' ), $this->get_file_content() );
+		$this->add_webdav_response( 'GET', $url, 200, $this->get_file_content() );
 
 		$info = $this->get_protocol( $url )->get_url_info( $url );
 
@@ -378,5 +378,67 @@ class Protocol extends externalFilesFromWebDavTests {
 	public function test_get_url_info_with_faulty_url(): void {
 		$this->assertEquals( array(), $this->get_protocol( 'file.jpg' )->get_url_info( 'file.jpg' ) );
 		$this->assertContains( 'Got faulty URL.', $this->get_result_texts() );
+	}
+
+	/**
+	 * Test the temporary file of a WebDAV file (e.g. for the cache of the proxy): it is loaded via the WebDAV
+	 * client, so the credentials and the hook for the client are used.
+	 *
+	 * @return void
+	 */
+	public function test_get_temp_file(): void {
+		$url = $this->domain . '/remote.php/dav/files/user/example.jpg';
+		$this->add_webdav_response( 'GET', $url, 200, $this->get_file_content() );
+
+		$tmp_file = $this->get_protocol( $url )->get_temp_file( $url, \ExternalFilesInMediaLibrary\Plugin\Helper::get_wp_filesystem() );
+
+		$this->assertIsString( $tmp_file );
+		$this->tmp_files[] = $tmp_file;
+		$this->assertEquals( $this->get_file_content(), file_get_contents( $tmp_file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		$requests = $this->get_webdav_requests();
+		$this->assertCount( 1, $requests );
+		$this->assertEquals( 'user:secret', $requests[0]['curl'][ CURLOPT_USERPWD ] );
+	}
+
+	/**
+	 * Test the temporary file of a WebDAV file, if the WebDAV server returns an error.
+	 *
+	 * @return void
+	 */
+	public function test_get_temp_file_with_error(): void {
+		$url = $this->domain . '/remote.php/dav/files/user/example.jpg';
+		$this->add_webdav_response( 'GET', $url, 404 );
+
+		$this->assertFalse( $this->get_protocol( $url )->get_temp_file( $url, \ExternalFilesInMediaLibrary\Plugin\Helper::get_wp_filesystem() ) );
+		$this->assertNotEmpty( array_filter( $this->get_log_entries( $url ), static fn( $entry ) => str_contains( (string) wp_json_encode( $entry ), 'File could not be loaded from WebDAV' ) ) );
+	}
+
+	/**
+	 * Test the temporary file of a faulty URL.
+	 *
+	 * @return void
+	 */
+	public function test_get_temp_file_with_faulty_url(): void {
+		$this->assertFalse( $this->get_protocol( 'file.jpg' )->get_temp_file( 'file.jpg', \ExternalFilesInMediaLibrary\Plugin\Helper::get_wp_filesystem() ) );
+		$this->assertEmpty( $this->get_webdav_requests() );
+	}
+
+	/**
+	 * Test the import of a single file from a WebDAV server with port.
+	 *
+	 * @return void
+	 */
+	public function test_get_url_infos_with_port(): void {
+		$url = 'https://webdav.example.com:8443/remote.php/dav/files/user/example.jpg';
+		$this->add_webdav_response( 'PROPFIND', $url, 207, $this->get_propfind_body( array( '/remote.php/dav/files/user/example.jpg' => array( 'size' => 706, 'type' => 'image/jpeg' ) ) ) );
+		$this->add_webdav_response( 'GET', $url, 200, $this->get_file_content() );
+
+		$results = $this->get_protocol( $url )->get_url_infos();
+
+		$this->assertCount( 1, $results );
+		$this->tmp_files[] = $results[0]['tmp-file'];
+		$this->assertEquals( $url, $results[0]['url'] );
+		$this->assertEquals( $this->get_file_content(), file_get_contents( $results[0]['tmp-file'] ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 	}
 }
