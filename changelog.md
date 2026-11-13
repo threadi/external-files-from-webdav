@@ -6,6 +6,7 @@
 
 - Added possibility to define the credentials via constants, e.g. in wp-config.php (requires External Files in Media Library 6.0.0)
 - Credentials from constants are only used for the server defined via constant, saved external sources on other servers are not usable then
+- Added possibility to define several connections via constants, e.g. for two servers (requires External Files in Media Library 6.0.0)
 - Added documentation for the constants in docs/constants.md
 - Added support for the folder structure of exported files, missing folders are created (requires External Files in Media Library 6.0.0)
 - Added support for private files (requires External Files in Media Library 6.0.0): files are delivered via the cache of the proxy, which loads them with the credentials of the external source
@@ -13,6 +14,7 @@
 - Added integration tests against a real WebDAV server of Sabre and a GitHub workflow for them
 - Directories are imported file by file via the import of External Files in Media Library 6.0.0: also directories with tens of thousands of files, in the background if necessary
 - Added integration test for the import of a directory with 1,100 files
+- Added search terms for the command palette of WordPress, e.g. other names of the service (requires External Files in Media Library 6.0.0)
 
 ### Changed
 

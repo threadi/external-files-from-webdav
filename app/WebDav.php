@@ -1300,4 +1300,15 @@ class WebDav extends Service_Base implements Service {
 			throw new Exception( esc_html__( 'The test file could not be deleted on WebDAV.', 'external-files-from-webdav' ) );
 		}
 	}
+
+	/**
+	 * Return further search terms of this service, separated by commas (e.g. for the command palette).
+	 *
+	 * Requires "External Files in Media Library" 6.0.0 or newer.
+	 *
+	 * @return string
+	 */
+	protected function get_keywords(): string {
+		return 'WebDAV, Nextcloud, ownCloud, Seafile, DAV, cloud';
+	}
 }

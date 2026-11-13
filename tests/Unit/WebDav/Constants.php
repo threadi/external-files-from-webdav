@@ -48,6 +48,7 @@ class Constants extends externalFilesFromWebDavTests {
 		++self::$counter;
 		$this->prefix = 'EFMLWDTEST' . self::$counter . '_';
 		add_filter( 'efml_service_field_constant_name', array( $this, 'set_constant_name' ) );
+		add_filter( 'efml_service_connections_constant_name', array( $this, 'set_constant_name' ) );
 	}
 
 	/**
@@ -57,6 +58,7 @@ class Constants extends externalFilesFromWebDavTests {
 	 */
 	public function tear_down(): void {
 		remove_filter( 'efml_service_field_constant_name', array( $this, 'set_constant_name' ) );
+		remove_filter( 'efml_service_connections_constant_name', array( $this, 'set_constant_name' ) );
 		parent::tear_down();
 	}
 
@@ -154,5 +156,56 @@ class Constants extends externalFilesFromWebDavTests {
 		$this->assertEquals( 'own-secret', $fields['password']['value'] );
 		$this->assertTrue( WebDav::get_instance()->is_url_blocked_by_constants( 'https://other.example.com/' ) );
 		$this->assertFalse( WebDav::get_instance()->is_url_blocked_by_constants( $this->domain . '/remote.php/' ) );
+	}
+
+	/**
+	 * Test several connections: the export uses the chosen connection or the connection for the server of the URL.
+	 *
+	 * @return void
+	 */
+	public function test_several_connections(): void {
+		// skip the test, if the main plugin does not support several connections.
+		if ( ! method_exists( WebDav::get_instance(), 'get_connections' ) ) {
+			$this->markTestSkipped( 'Requires "External Files in Media Library" 6.0.0 or newer.' );
+		}
+
+		define( $this->prefix . 'EFML_WEBDAV_SERVER', 'https://default.example.com' );
+		define( $this->prefix . 'EFML_WEBDAV_LOGIN', 'default-user' );
+		define( $this->prefix . 'EFML_WEBDAV_PASSWORD', 'default-secret' );
+		define( $this->prefix . 'EFML_WEBDAV_CONNECTIONS', 'backup' );
+		define( $this->prefix . 'EFML_WEBDAV_BACKUP_SERVER', $this->domain );
+		define( $this->prefix . 'EFML_WEBDAV_BACKUP_LOGIN', 'backup-user' );
+		define( $this->prefix . 'EFML_WEBDAV_BACKUP_PASSWORD', 'backup-secret' );
+
+		$webdav = WebDav::get_instance();
+		$this->assertEquals( array( 'default', 'backup' ), array_keys( $webdav->get_connections() ) );
+
+		// the connection for the server of the URL is used.
+		$fields = $webdav->get_fields_for_url( array(), $this->domain . '/file.jpg' );
+		$this->assertEquals( 'backup-user', $fields['login']['value'] );
+
+		// the export with the chosen connection.
+		$attachment_id = $this->create_local_attachment();
+		$file_name     = basename( (string) get_attached_file( $attachment_id, true ) );
+		$this->add_webdav_response( 'PUT', $this->domain . '/remote.php/dav/files/backup-user/' . $file_name, 201 );
+		$credentials = array(
+			'fields' => array(
+				'efml_connection' => array( 'value' => 'backup' ),
+				'server'          => array( 'value' => '' ),
+				'login'           => array( 'value' => '' ),
+				'password'        => array( 'value' => '' ),
+				'path'            => array( 'value' => '/remote.php/dav/files/' ),
+			),
+		);
+		$url         = WebDav\Export::get_instance()->export_file( $attachment_id, trailingslashit( $this->domain ) . $file_name, $credentials );
+		$this->assertEquals( $this->domain . '/remote.php/dav/files/backup-user/' . $file_name, $url );
+		$requests = $this->get_webdav_requests();
+		$this->assertCount( 1, $requests );
+		$this->assertEquals( 'backup-user:backup-secret', $requests[0]['curl'][ CURLOPT_USERPWD ] );
+
+		// the default connection is never used for the server of the other connection.
+		$fields = $webdav->get_fields_for_url( array( 'efml_connection' => array( 'value' => 'default' ) ), $this->domain . '/file.jpg' );
+		$this->assertArrayNotHasKey( 'login', $fields );
+		$this->assertTrue( $webdav->is_url_blocked_by_constants( 'https://other.example.com/' ) );
 	}
 }

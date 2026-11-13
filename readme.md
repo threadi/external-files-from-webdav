@@ -4,6 +4,20 @@
 
 This repository provides the features of the WordPress plugin _External Files from WebDav in Media Library_. The repository is used as a basis for deploying the plugin to the WordPress repository. It is not intended to run as a plugin as it is, even if that is possible for development.
 
+## Features
+
+* Use files from any WebDAV server in your media library, e.g. Nextcloud, ownCloud or Seafile.
+* Import single files or complete folders, also with thousands of files, and synchronize them automatically.
+* Export (offload) files of your media library to your WebDAV server, optionally sorted into folders by year and month.
+* Private files: delivered via the proxy of your website, which loads them with the credentials of the external source.
+* Credentials via constants in your wp-config.php, also for several connections (e.g. two servers).
+* Connection test to check the credentials and permissions.
+
+## Documentation
+
+* [Credentials via constants](docs/constants.md) ([German](docs/constants_de.md))
+* [What is possible with External Files in Media Library](https://github.com/threadi/external-files-in-media-library/blob/master/docs/features.md)
+
 ## Hints
 
 * You will need the plugin _External Files in Media Library_ to run this plugin.

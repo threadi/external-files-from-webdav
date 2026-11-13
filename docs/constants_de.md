@@ -24,3 +24,19 @@ define( 'EFML_WEBDAV_PATH', '/remote.php/dav/files/' ); // optional
 ```
 
 Nutzt dein WebDAV-Server nicht den Standard-Port, gib ihn beim Server mit an, z. B. `https://nextcloud.example.com:8443`. Beim Vergleich mit dem Server einer URL zählt nur der Hostname.
+
+## Mehrere Verbindungen
+
+Du kannst mehrere Verbindungen festlegen, z. B. für zwei Server. Liste die Namen der Verbindungen in `EFML_WEBDAV_CONNECTIONS` auf und ergänze den Namen der Verbindung in den Namen ihrer Konstanten. Ist mehr als eine Verbindung vollständig, zeigt das Formular für eine neue externe Quelle das Feld „Verbindung“. Ohne gewählte Verbindung gilt die Verbindung für den Server der URL. Details stehen in der [Dokumentation des Hauptplugins](https://github.com/threadi/external-files-in-media-library/blob/master/docs/constants_de.md#mehrere-verbindungen).
+
+```php
+define( 'EFML_WEBDAV_CONNECTIONS', 'nextcloud,backup' );
+
+define( 'EFML_WEBDAV_NEXTCLOUD_SERVER', 'https://nextcloud.example.com' );
+define( 'EFML_WEBDAV_NEXTCLOUD_LOGIN', 'dein-login' );
+define( 'EFML_WEBDAV_NEXTCLOUD_PASSWORD', 'dein-passwort' );
+
+define( 'EFML_WEBDAV_BACKUP_SERVER', 'https://backup.example.com' );
+define( 'EFML_WEBDAV_BACKUP_LOGIN', 'anderer-login' );
+define( 'EFML_WEBDAV_BACKUP_PASSWORD', 'anderes-passwort' );
+```
