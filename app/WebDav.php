@@ -1311,4 +1311,30 @@ class WebDav extends Service_Base implements Service {
 	protected function get_keywords(): string {
 		return 'WebDAV, Nextcloud, ownCloud, Seafile, DAV, cloud';
 	}
+
+	/**
+	 * Return the help for the setup of this service.
+	 *
+	 * @return array{intro?: string, steps?: array<int,string>, hints?: array<int,string>, code?: array{label: string, content: string, hint?: string}, links?: array<int,array{label: string, url: string}>}
+	 */
+	public function get_setup_guide(): array {
+		return array(
+			'intro' => __( 'Many storages and cloud services offer access via WebDAV, e.g. Nextcloud, ownCloud or NAS systems. You get the address, the login and the password from the provider of the storage or its administrator.', 'external-files-from-webdav' ),
+			'steps' => array(
+				__( 'Enter the address of the server, e.g. <code>https://cloud.example.com</code>.', 'external-files-from-webdav' ),
+				__( 'Enter login and password. If your storage offers app passwords (e.g. Nextcloud under Personal settings → Security), use an own app password for this website.', 'external-files-from-webdav' ),
+				__( 'Enter the path of the WebDAV interface. Your login is added to it automatically. The default <code>/remote.php/dav/files/</code> fits e.g. Nextcloud, other storages use other paths.', 'external-files-from-webdav' ),
+			),
+			'hints' => array(
+				__( 'If two-factor authentication is enabled for your account, the login only works with an app password.', 'external-files-from-webdav' ),
+				__( 'The plugin only connects via HTTPS.', 'external-files-from-webdav' ),
+			),
+			'links' => array(
+				array(
+					'label' => __( 'Example: WebDAV with Nextcloud', 'external-files-from-webdav' ),
+					'url'   => 'https://docs.nextcloud.com/server/stable/user_manual/en/files/access_webdav.html',
+				),
+			),
+		);
+	}
 }

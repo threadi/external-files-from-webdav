@@ -298,3 +298,31 @@ msgstr[1] "%1$d Dateien konntem beim WebDAV-Import nicht geladen werden: <br><br
 #: app/WebDav/Protocol.php:547
 msgid "File could not be loaded from WebDAV:"
 msgstr "Die Datei konnte nicht von WebDAV geladen werden:"
+
+#: app/WebDav.php:1322
+msgid "Many storages and cloud services offer access via WebDAV, e.g. Nextcloud, ownCloud or NAS systems. You get the address, the login and the password from the provider of the storage or its administrator."
+msgstr "Viele Speicher und Cloud-Dienste bieten Zugriff per WebDAV, z. B. Nextcloud, ownCloud oder NAS-Systeme. Adresse, Login und Passwort bekommst du vom Anbieter des Speichers oder seinem Administrator."
+
+#: app/WebDav.php:1324
+msgid "Enter the address of the server, e.g. <code>https://cloud.example.com</code>."
+msgstr "Gib die Adresse des Servers ein, z. B. <code>https://cloud.example.com</code>."
+
+#: app/WebDav.php:1325
+msgid "Enter login and password. If your storage offers app passwords (e.g. Nextcloud under Personal settings → Security), use an own app password for this website."
+msgstr "Gib Login und Passwort ein. Bietet dein Speicher App-Passwörter (z. B. Nextcloud unter Persönliche Einstellungen → Sicherheit), nutze ein eigenes App-Passwort für diese Website."
+
+#: app/WebDav.php:1326
+msgid "Enter the path of the WebDAV interface. Your login is added to it automatically. The default <code>/remote.php/dav/files/</code> fits e.g. Nextcloud, other storages use other paths."
+msgstr "Gib den Pfad der WebDAV-Schnittstelle ein. Dein Login wird automatisch angehängt. Der Standard <code>/remote.php/dav/files/</code> passt z. B. für Nextcloud, andere Speicher nutzen andere Pfade."
+
+#: app/WebDav.php:1329
+msgid "If two-factor authentication is enabled for your account, the login only works with an app password."
+msgstr "Ist für dein Konto die Zwei-Faktor-Authentifizierung aktiv, klappt die Anmeldung nur mit einem App-Passwort."
+
+#: app/WebDav.php:1330
+msgid "The plugin only connects via HTTPS."
+msgstr "Das Plugin verbindet sich nur per HTTPS."
+
+#: app/WebDav.php:1334
+msgid "Example: WebDAV with Nextcloud"
+msgstr "Beispiel: WebDAV mit Nextcloud"

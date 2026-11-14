@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added help "Where do I find these details?" to the form and to the quickstart (requires External Files in Media Library 6.0.0): where to get the address and the access data, with Nextcloud as example
 - Added possibility to define the credentials via constants, e.g. in wp-config.php (requires External Files in Media Library 6.0.0)
 - Credentials from constants are only used for the server defined via constant, saved external sources on other servers are not usable then
 - Added possibility to define several connections via constants, e.g. for two servers (requires External Files in Media Library 6.0.0)

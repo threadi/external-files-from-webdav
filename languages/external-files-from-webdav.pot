@@ -296,3 +296,31 @@ msgstr[1] ""
 #: app/WebDav/Protocol.php:547
 msgid "File could not be loaded from WebDAV:"
 msgstr ""
+
+#: app/WebDav.php:1322
+msgid "Many storages and cloud services offer access via WebDAV, e.g. Nextcloud, ownCloud or NAS systems. You get the address, the login and the password from the provider of the storage or its administrator."
+msgstr ""
+
+#: app/WebDav.php:1324
+msgid "Enter the address of the server, e.g. <code>https://cloud.example.com</code>."
+msgstr ""
+
+#: app/WebDav.php:1325
+msgid "Enter login and password. If your storage offers app passwords (e.g. Nextcloud under Personal settings → Security), use an own app password for this website."
+msgstr ""
+
+#: app/WebDav.php:1326
+msgid "Enter the path of the WebDAV interface. Your login is added to it automatically. The default <code>/remote.php/dav/files/</code> fits e.g. Nextcloud, other storages use other paths."
+msgstr ""
+
+#: app/WebDav.php:1329
+msgid "If two-factor authentication is enabled for your account, the login only works with an app password."
+msgstr ""
+
+#: app/WebDav.php:1330
+msgid "The plugin only connects via HTTPS."
+msgstr ""
+
+#: app/WebDav.php:1334
+msgid "Example: WebDAV with Nextcloud"
+msgstr ""

@@ -637,4 +637,19 @@ class WebDav extends externalFilesFromWebDavTests {
 		$this->assertEquals( $domain . '/remote.php/dav/files/user/example.jpg', $listing['files'][0]['file'] );
 		$this->assertEquals( array( $domain . '/remote.php/dav/files/user/My%20Photos/' ), array_keys( $listing['dirs'] ) );
 	}
+
+	/**
+	 * Test the help for the setup: Nextcloud is only an example.
+	 *
+	 * @return void
+	 */
+	public function test_setup_guide(): void {
+		$service = \ExternalFilesFromWebDav\WebDav::get_instance();
+		$guide   = $service->get_setup_guide();
+		$this->assertStringContainsString( 'e.g. Nextcloud', $guide['intro'] );
+		$this->assertStringContainsString( '/remote.php/dav/files/', $guide['steps'][2] );
+		if ( method_exists( $service, 'get_setup_guide_html' ) ) {
+			$this->assertStringContainsString( 'efml-setup-guide', $service->get_setup_guide_html() );
+		}
+	}
 }
