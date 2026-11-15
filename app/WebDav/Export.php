@@ -63,6 +63,95 @@ class Export extends Export_Base {
 	 * @return string|bool
 	 */
 	public function export_file( int $attachment_id, string $target, array $credentials ): string|bool {
+		// get the file path.
+		$file_path = get_attached_file( $attachment_id, true );
+
+		// bail if no file could be found.
+		if ( ! is_string( $file_path ) ) {
+			// log this event.
+			Log::get_instance()->create( __( 'Could not load file path for given attachment ID.', 'external-files-from-webdav' ), $target, 'error' );
+
+			// do nothing more.
+			return false;
+		}
+
+		// get the local "WP_Filesystem".
+		$wp_filesystem_local = Helper::get_wp_filesystem();
+
+		// bail if source file does not exist.
+		if ( ! $wp_filesystem_local->exists( $file_path ) ) {
+			// log this event.
+			Log::get_instance()->create( __( 'Given file does not exist:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $file_path ) . '</code>', $target, 'error' );
+
+			// do nothing more.
+			return false;
+		}
+
+		// upload the file.
+		return $this->upload( $file_path, $target, $credentials );
+	}
+
+	/**
+	 * Return whether this service could export the sizes of images.
+	 *
+	 * Requires "External Files in Media Library" 6.0.0 or newer.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_sizes(): bool {
+		return true;
+	}
+
+	/**
+	 * Export an additional file of an attachment (e.g. a size of an image) to the WebDAV server.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param int                 $attachment_id The attachment ID.
+	 * @param string              $source        The absolute path of the local file.
+	 * @param string              $target        The target of the file.
+	 * @param array<string,mixed> $credentials   The credentials.
+	 *
+	 * @return string|bool
+	 */
+	public function export_size( int $attachment_id, string $source, string $target, array $credentials ): string|bool {
+		// bail if the file does not exist.
+		if ( ! Helper::get_wp_filesystem()->exists( $source ) ) {
+			return false;
+		}
+
+		// upload the file.
+		return $this->upload( $source, $target, $credentials );
+	}
+
+	/**
+	 * Delete an additional file of an attachment on the WebDAV server.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param int                 $attachment_id The attachment ID.
+	 * @param string              $url           The URL of the file.
+	 * @param string              $target        The target of the file.
+	 * @param array<string,mixed> $credentials   The credentials.
+	 *
+	 * @return bool
+	 */
+	public function delete_size( int $attachment_id, string $url, string $target, array $credentials ): bool {
+		return $this->delete_exported_file( $url, $credentials, $attachment_id );
+	}
+
+	/**
+	 * Upload the given local file to the given target on the WebDAV server and return its URL, or false on error.
+	 *
+	 * @param string              $file_path   The absolute path of the local file.
+	 * @param string              $target      The target.
+	 * @param array<string,mixed> $credentials The credentials.
+	 *
+	 * @return string|false
+	 */
+	private function upload( string $file_path, string $target, array $credentials ): string|false {
 		// match the variables for hook documentation.
 		$directory = $target;
 
@@ -103,30 +192,6 @@ class Export extends Export_Base {
 
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
-
-		// get the file path.
-		$file_path = get_attached_file( $attachment_id, true );
-
-		// bail if no file could be found.
-		if ( ! is_string( $file_path ) ) {
-			// log this event.
-			Log::get_instance()->create( __( 'Could not load file path for given attachment ID.', 'external-files-from-webdav' ), $target, 'error' );
-
-			// do nothing more.
-			return false;
-		}
-
-		// get the local "WP_Filesystem".
-		$wp_filesystem_local = Helper::get_wp_filesystem();
-
-		// bail if source file does not exist.
-		if ( ! $wp_filesystem_local->exists( $file_path ) ) {
-			// log this event.
-			Log::get_instance()->create( __( 'Given file does not exist:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $file_path ) . '</code>', $target, 'error' );
-
-			// do nothing more.
-			return false;
-		}
 
 		// set the upload path we will use for this file.
 		$upload_path = $this->get_upload_path( $fields, $parse_url['path'] );
