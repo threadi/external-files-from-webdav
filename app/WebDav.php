@@ -40,6 +40,57 @@ use WP_User;
  */
 class WebDav extends Service_Base implements Service {
 	/**
+	 * List of the callbacks to encrypt and decrypt settings with their context.
+	 *
+	 * @var array<string,callable>
+	 */
+	private array $crypt_callbacks = array();
+
+	/**
+	 * Return whether the user settings of this service are encrypted with a context.
+	 *
+	 * The main plugin saves the user settings with the context "usermeta:efml_<name>", if this returns true.
+	 *
+	 * @return bool
+	 */
+	public function is_crypt_context_supported(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the callback to encrypt ("save") or decrypt ("read") a setting with its context.
+	 *
+	 * Values saved without context (by older versions) stay readable. With a main plugin, which does not
+	 * support contexts, the callbacks without context are used.
+	 *
+	 * @param string $type    The type: "save" or "read".
+	 * @param string $context The context, e.g. "option:" and the name of the option.
+	 *
+	 * @return callable
+	 */
+	protected function get_crypt_callback( string $type, string $context ): callable {
+		// return the callback, if it has been created before (the same object is needed for has_filter()).
+		$key = $type . ':' . $context;
+		if ( isset( $this->crypt_callbacks[ $key ] ) ) {
+			return $this->crypt_callbacks[ $key ];
+		}
+
+		// get the crypt object.
+		$crypt_obj = Crypt::get_instance();
+
+		// create the callback.
+		if ( 'save' === $type ) {
+			$callback = method_exists( $crypt_obj, 'get_save_callback' ) ? $crypt_obj->get_save_callback( $context ) : array( $this, 'encrypt_value' );
+		} else {
+			$callback = method_exists( $crypt_obj, 'get_read_callback' ) ? $crypt_obj->get_read_callback( $context ) : array( $this, 'decrypt_value' );
+		}
+
+		// remember and return it.
+		$this->crypt_callbacks[ $key ] = $callback;
+		return $callback;
+	}
+
+	/**
 	 * The object name.
 	 *
 	 * @var string
@@ -214,8 +265,8 @@ class WebDav extends Service_Base implements Service {
 				$setting->set_section( $section );
 				$setting->set_autoload( false );
 				$setting->set_type( 'string' );
-				$setting->set_read_callback( array( $this, 'decrypt_value' ) );
-				$setting->set_save_callback( array( $this, 'encrypt_value' ) );
+				$setting->set_read_callback( $this->get_crypt_callback( 'read', 'option:eml_webdav_login' ) );
+				$setting->set_save_callback( $this->get_crypt_callback( 'save', 'option:eml_webdav_login' ) );
 				$field = new Text( $settings_obj );
 				$field->set_title( __( 'Login', 'external-files-from-webdav' ) );
 				$field->set_placeholder( __( 'Your login', 'external-files-from-webdav' ) );
@@ -229,8 +280,8 @@ class WebDav extends Service_Base implements Service {
 				$setting->set_section( $section );
 				$setting->set_autoload( false );
 				$setting->set_type( 'string' );
-				$setting->set_read_callback( array( $this, 'decrypt_value' ) );
-				$setting->set_save_callback( array( $this, 'encrypt_value' ) );
+				$setting->set_read_callback( $this->get_crypt_callback( 'read', 'option:eml_webdav_password' ) );
+				$setting->set_save_callback( $this->get_crypt_callback( 'save', 'option:eml_webdav_password' ) );
 				$field = new Password( $settings_obj );
 				$field->set_title( __( 'Password', 'external-files-from-webdav' ) );
 				$field->set_placeholder( __( 'Your password', 'external-files-from-webdav' ) );
@@ -633,7 +684,7 @@ class WebDav extends Service_Base implements Service {
 			}
 
 			// return the region from settings.
-			return Crypt::get_instance()->decrypt( $path ) . $fields['login']['value'] . '/';
+			return Crypt::get_instance()->decrypt( $path, 'usermeta:efml_webdav_path' ) . $fields['login']['value'] . '/';
 		}
 
 		// use the field setting.
@@ -1033,8 +1084,8 @@ class WebDav extends Service_Base implements Service {
 		// get it global, if this is enabled.
 		if ( $this->is_mode( 'global' ) ) {
 			$values['server']   = get_option( 'eml_webdav_server', '' );
-			$values['login']    = Crypt::get_instance()->decrypt( get_option( 'eml_webdav_login', '' ) );
-			$values['password'] = Crypt::get_instance()->decrypt( get_option( 'eml_webdav_password', '' ) );
+			$values['login']    = Crypt::get_instance()->decrypt( (string) get_option( 'eml_webdav_login', '' ), 'option:eml_webdav_login' );
+			$values['password'] = Crypt::get_instance()->decrypt( (string) get_option( 'eml_webdav_password', '' ), 'option:eml_webdav_password' );
 			$values['path']     = get_option( 'eml_webdav_path', '' );
 		}
 
@@ -1049,10 +1100,10 @@ class WebDav extends Service_Base implements Service {
 			}
 
 			// get the values.
-			$values['server']   = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_server', true ) );
-			$values['login']    = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_login', true ) );
-			$values['password'] = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_password', true ) );
-			$values['path']     = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_path', true ) );
+			$values['server']   = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_server', true ), 'usermeta:efml_webdav_server' );
+			$values['login']    = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_login', true ), 'usermeta:efml_webdav_login' );
+			$values['password'] = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_password', true ), 'usermeta:efml_webdav_password' );
+			$values['path']     = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_path', true ), 'usermeta:efml_webdav_path' );
 		}
 
 		// return the resulting list of values.

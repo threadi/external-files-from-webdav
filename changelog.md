@@ -20,6 +20,7 @@
 
 ### Changed
 
+- Encrypted settings and access data are bound to their purpose (requires External Files in Media Library 6.0.0): an encrypted value copied into another field cannot be decrypted there; values saved by older versions stay readable and are bound to their purpose when they are saved again
 - Updated German translations
 
 ### Fixed
