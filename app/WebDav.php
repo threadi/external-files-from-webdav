@@ -172,6 +172,20 @@ class WebDav extends Service_Base implements Service {
 		// add settings.
 		add_action( 'init', array( $this, 'init_webdav' ), 30 );
 
+		// use the protocol in each request, e.g. for private files via the proxy and for exports of uploads by users
+		// without the capability for this service. Only if the main plugin checks the capability for imports via the
+		// protocol (External Files in Media Library 6.0.0 or newer), otherwise only for users with the capability.
+		$protocol_in_each_request = method_exists( '\ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base', 'is_import_allowed_for_user' );
+		if ( $protocol_in_each_request ) {
+			add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
+		}
+
+		// use the hooks for the connection in each request, too: the proxy and exports of uploads need them.
+		add_filter( 'efmlwd_service_webdav_client', array( $this, 'ignore_self_signed_ssl' ) );
+		add_filter( 'efmlwd_service_webdav_path', array( $this, 'set_path' ), 10, 2 );
+		add_action( 'efml_export_before_on_service', array( $this, 'enable_unsafe_urls_for_export' ) );
+		add_action( 'efml_proxy_before', array( $this, 'enable_unsafe_urls_for_proxy' ) );
+
 		// bail if user has no capability for this service.
 		if ( ! defined( 'DOING_CRON' ) && ! Helper::is_cli() && ! current_user_can( 'efml_cap_' . $this->get_name() ) ) {
 			return;
@@ -180,13 +194,13 @@ class WebDav extends Service_Base implements Service {
 		// set title.
 		$this->title = __( 'Choose file(s) from your WebDAV', 'external-files-from-webdav' ); // @phpstan-ignore property.notFound
 
+		// use the protocol for users with the capability, if the main plugin does not check it for imports.
+		if ( ! $protocol_in_each_request ) {
+			add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
+		}
+
 		// use our own hooks.
-		add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
 		add_filter( 'efmlwd_service_webdav_hide_file', array( $this, 'prevent_not_allowed_files' ), 10, 3 );
-		add_filter( 'efmlwd_service_webdav_client', array( $this, 'ignore_self_signed_ssl' ) );
-		add_filter( 'efmlwd_service_webdav_path', array( $this, 'set_path' ), 10, 2 );
-		add_action( 'efml_export_before_on_service', array( $this, 'enable_unsafe_urls_for_export' ) );
-		add_action( 'efml_proxy_before', array( $this, 'enable_unsafe_urls_for_proxy' ) );
 
 		// use hooks.
 		add_action( 'show_user_profile', array( $this, 'add_user_settings' ) );

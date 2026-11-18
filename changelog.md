@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- Fixed delivery of private files via the proxy for visitors and users without the capability for WebDAV, and exports of uploads by such users (requires External Files in Media Library 6.0.0): the protocol is known in each request now, imports still require the capability for WebDAV
 - Fixed high memory usage during the export of large files, they are now uploaded as stream (for this the credentials are sent directly via Basic auth for HTTPS connections, otherwise or if the server requires another authentication method, files are loaded into memory as before)
 - Fixed high memory usage during the import of large files and their loading into the cache of the proxy, they are now saved directly into a local file
 - The cache of the proxy now loads files via the WebDAV client, so the settings via the hook "efmlwd_service_webdav_client" and the authentication methods of WebDAV (e.g. Digest) are used for it too

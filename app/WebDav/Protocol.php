@@ -33,6 +33,27 @@ class Protocol extends Protocol_Base {
 	protected string $name = 'webdav';
 
 	/**
+	 * Return whether files could be imported from WebDAV in the actual request.
+	 *
+	 * The protocol is also registered for visitors (e.g. to deliver private files via the proxy), but only users
+	 * with the capability for WebDAV are allowed to import files (as well as cron and WP CLI).
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function is_import_allowed_for_user(): bool {
+		// use the check of the service, if it is available (External Files in Media Library 6.0.0 or newer).
+		$service_obj = WebDav::get_instance();
+		if ( method_exists( $service_obj, 'is_import_permitted' ) ) {
+			return $service_obj->is_import_permitted();
+		}
+
+		// otherwise check the capability for the service.
+		return defined( 'EFML_SYNC_RUNNING' ) || wp_doing_cron() || Helper::is_cli() || current_user_can( 'efml_cap_' . $service_obj->get_name() );
+	}
+
+	/**
 	 * List of supported tcp protocols with their ports.
 	 *
 	 * @var array<string,int>
