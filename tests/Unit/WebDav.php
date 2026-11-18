@@ -170,6 +170,33 @@ class WebDav extends externalFilesFromWebDavTests {
 	}
 
 	/**
+	 * Test the default path, if the settings have never been saved (e.g. with credentials via constants). A saved
+	 * empty path is still used.
+	 *
+	 * @return void
+	 */
+	public function test_set_path_without_saved_settings(): void {
+		$fields = $this->get_webdav_with_fields()->get_fields();
+
+		// test 1: global mode without saved path uses the default.
+		update_option( 'eml_webdav_credentials_vault', 'global' );
+		delete_option( 'eml_webdav_path' );
+		$this->assertEquals( '/remote.php/dav/files/user/', $this->get_webdav()->set_path( '', $fields ) );
+
+		// test 2: a saved empty path is kept.
+		update_option( 'eml_webdav_path', '' );
+		$this->assertEquals( 'user/', $this->get_webdav()->set_path( '', $fields ) );
+
+		// test 3: user mode without saved path uses the default.
+		update_option( 'eml_webdav_credentials_vault', 'user' );
+		$this->do_login();
+		delete_user_meta( 1, 'efml_webdav_path' );
+		$this->assertEquals( '/remote.php/dav/files/user/', $this->get_webdav()->set_path( '', $fields ) );
+
+		delete_option( 'eml_webdav_credentials_vault' );
+	}
+
+	/**
 	 * Test the user settings for WebDAV.
 	 *
 	 * @return void
@@ -525,7 +552,8 @@ class WebDav extends externalFilesFromWebDavTests {
 	}
 
 	/**
-	 * Test if the hooks are only registered for users with the capability for WebDAV.
+	 * Test if the hooks are only registered for users with the capability for WebDAV. The protocol is registered in
+	 * each request (e.g. for the proxy for visitors), the import checks the capability itself.
 	 *
 	 * @return void
 	 */
@@ -534,7 +562,8 @@ class WebDav extends externalFilesFromWebDavTests {
 
 		// test 1: without the capability.
 		$webdav->init();
-		$this->assertFalse( has_filter( 'efml_protocols', array( $webdav, 'add_protocol' ) ) );
+		$this->assertIsInt( has_filter( 'efml_protocols', array( $webdav, 'add_protocol' ) ) );
+		$this->assertFalse( has_filter( 'efmlwd_service_webdav_hide_file', array( $webdav, 'prevent_not_allowed_files' ) ) );
 
 		// test 2: with the capability.
 		$this->do_login();

@@ -40,6 +40,13 @@ use WP_User;
  */
 class WebDav extends Service_Base implements Service {
 	/**
+	 * The default path of the WebDAV interface (e.g. of Nextcloud), to which the login is added.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 */
+	public const DEFAULT_PATH = '/remote.php/dav/files/';
+
+	/**
 	 * List of the callbacks to encrypt and decrypt settings with their context.
 	 *
 	 * @var array<string,callable>
@@ -175,7 +182,7 @@ class WebDav extends Service_Base implements Service {
 		// use the protocol in each request, e.g. for private files via the proxy and for exports of uploads by users
 		// without the capability for this service. Only if the main plugin checks the capability for imports via the
 		// protocol (External Files in Media Library 6.0.0 or newer), otherwise only for users with the capability.
-		$protocol_in_each_request = method_exists( '\ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base', 'is_import_allowed_for_user' );
+		$protocol_in_each_request = method_exists( '\ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base', 'is_import_allowed_for_user' ); // @phpstan-ignore function.alreadyNarrowedType
 		if ( $protocol_in_each_request ) {
 			add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
 		}
@@ -308,7 +315,7 @@ class WebDav extends Service_Base implements Service {
 				$setting = $settings_obj->add_setting( 'eml_webdav_path' );
 				$setting->set_section( $section );
 				$setting->set_type( 'string' );
-				$setting->set_default( '/remote.php/dav/files/' );
+				$setting->set_default( self::DEFAULT_PATH );
 				$field = new Text( $settings_obj );
 				$field->set_title( __( 'Path', 'external-files-from-webdav' ) );
 				$field->set_description( __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ) );
@@ -675,8 +682,9 @@ class WebDav extends Service_Base implements Service {
 				return $fields['path']['value'] . $fields['login']['value'] . '/';
 			}
 
-			// return path from settings.
-			return get_option( 'eml_webdav_path' ) . $fields['login']['value'] . '/';
+			// return path from settings (with the default, if the settings have never been saved, e.g. if the
+			// credentials are defined via constants).
+			return get_option( 'eml_webdav_path', self::DEFAULT_PATH ) . $fields['login']['value'] . '/';
 		}
 
 		// get from user setting, if enabled.
@@ -689,6 +697,11 @@ class WebDav extends Service_Base implements Service {
 				return '';
 			}
 
+			// use the default, if the user has never saved the setting.
+			if ( ! metadata_exists( 'user', $user->ID, 'efml_webdav_path' ) ) {
+				return self::DEFAULT_PATH . $fields['login']['value'] . '/';
+			}
+
 			// get the setting.
 			$path = get_user_meta( $user->ID, 'efml_webdav_path', true );
 
@@ -697,7 +710,7 @@ class WebDav extends Service_Base implements Service {
 				return '';
 			}
 
-			// return the region from settings.
+			// return the path from settings.
 			return Crypt::get_instance()->decrypt( $path, 'usermeta:efml_webdav_path' ) . $fields['login']['value'] . '/';
 		}
 
@@ -889,7 +902,7 @@ class WebDav extends Service_Base implements Service {
 				'label'       => __( 'Path', 'external-files-from-webdav' ),
 				'field'       => 'text',
 				'description' => __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ),
-				'default'     => '/remote.php/dav/files/',
+				'default'     => self::DEFAULT_PATH,
 			),
 		);
 
@@ -946,7 +959,7 @@ class WebDav extends Service_Base implements Service {
 					'type'        => 'text',
 					'label'       => __( 'Path', 'external-files-from-webdav' ),
 					'placeholder' => __( '/remote.php/dav/files/', 'external-files-from-webdav' ),
-					'value'       => ! empty( $values['path'] ) ? $values['path'] : '/remote.php/dav/files/',
+					'value'       => ! empty( $values['path'] ) ? $values['path'] : self::DEFAULT_PATH,
 					'readonly'    => ! empty( $values['path'] ),
 				),
 			);

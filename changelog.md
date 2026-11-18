@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- Fixed directory listing with credentials defined via constants without path, if the settings have never been saved ("Not Found"): the default path /remote.php/dav/files/ is used then, a saved path is kept
 - Fixed delivery of private files via the proxy for visitors and users without the capability for WebDAV, and exports of uploads by such users (requires External Files in Media Library 6.0.0): the protocol is known in each request now, imports still require the capability for WebDAV
 - Fixed high memory usage during the export of large files, they are now uploaded as stream (for this the credentials are sent directly via Basic auth for HTTPS connections, otherwise or if the server requires another authentication method, files are loaded into memory as before)
 - Fixed high memory usage during the import of large files and their loading into the cache of the proxy, they are now saved directly into a local file
