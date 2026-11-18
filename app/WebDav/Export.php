@@ -15,6 +15,8 @@ use ExternalFilesFromWebDav\WebDav;
 use ExternalFilesInMediaLibrary\ExternalFiles\Export_Base;
 use ExternalFilesInMediaLibrary\Plugin\Helper;
 use ExternalFilesInMediaLibrary\Plugin\Log;
+use Sabre\DAV\Client;
+use Sabre\HTTP\ClientHttpException;
 
 /**
  * Object for export files to AWS S3.
@@ -61,47 +63,6 @@ class Export extends Export_Base {
 	 * @return string|bool
 	 */
 	public function export_file( int $attachment_id, string $target, array $credentials ): string|bool {
-		// match the variables for hook documentation.
-		$directory = $target;
-
-		// get the main object.
-		$webdav_object = WebDav::get_instance();
-
-		// get the starting directory.
-		$parse_url = wp_parse_url( $target );
-
-		// bail if scheme or host is not found in directory URL.
-		if ( ! isset( $parse_url['scheme'], $parse_url['host'], $parse_url['path'] ) ) {
-			return false;
-		}
-
-		// get the fields.
-		$fields = $credentials['fields'];
-
-		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
-
-		// create settings array for request.
-		$settings = array(
-			'baseUri'  => $domain,
-			'userName' => $fields['login']['value'],
-			'password' => $fields['password']['value'],
-		);
-
-		/**
-		 * Filter the WebDAV settings.
-		 *
-		 * @since 1.0.0 Available since 1.0.0.
-		 *
-		 * @param array<string,string> $settings The settings to use.
-		 * @param string $domain The domain to use.
-		 * @param string $directory The requested URL.
-		 */
-		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
-
-		// get a new client.
-		$client = $webdav_object->get_client( $settings, $domain, $directory );
-
 		// get the file path.
 		$file_path = get_attached_file( $attachment_id, true );
 
@@ -126,18 +87,145 @@ class Export extends Export_Base {
 			return false;
 		}
 
+		// upload the file.
+		return $this->upload( $file_path, $target, $credentials );
+	}
+
+	/**
+	 * Return whether this service could export the sizes of images.
+	 *
+	 * Requires "External Files in Media Library" 6.0.0 or newer.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_sizes(): bool {
+		return true;
+	}
+
+	/**
+	 * Export an additional file of an attachment (e.g. a size of an image) to the WebDAV server.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param int                 $attachment_id The attachment ID.
+	 * @param string              $source        The absolute path of the local file.
+	 * @param string              $target        The target of the file.
+	 * @param array<string,mixed> $credentials   The credentials.
+	 *
+	 * @return string|bool
+	 */
+	public function export_size( int $attachment_id, string $source, string $target, array $credentials ): string|bool {
+		// bail if the file does not exist.
+		if ( ! Helper::get_wp_filesystem()->exists( $source ) ) {
+			return false;
+		}
+
+		// upload the file.
+		return $this->upload( $source, $target, $credentials );
+	}
+
+	/**
+	 * Delete an additional file of an attachment on the WebDAV server.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param int                 $attachment_id The attachment ID.
+	 * @param string              $url           The URL of the file.
+	 * @param string              $target        The target of the file.
+	 * @param array<string,mixed> $credentials   The credentials.
+	 *
+	 * @return bool
+	 */
+	public function delete_size( int $attachment_id, string $url, string $target, array $credentials ): bool {
+		return $this->delete_exported_file( $url, $credentials, $attachment_id );
+	}
+
+	/**
+	 * Upload the given local file to the given target on the WebDAV server and return its URL, or false on error.
+	 *
+	 * @param string              $file_path   The absolute path of the local file.
+	 * @param string              $target      The target.
+	 * @param array<string,mixed> $credentials The credentials.
+	 *
+	 * @return string|false
+	 */
+	private function upload( string $file_path, string $target, array $credentials ): string|false {
+		// match the variables for hook documentation.
+		$directory = $target;
+
+		// get the main object.
+		$webdav_object = WebDav::get_instance();
+
+		// get the starting directory.
+		$parse_url = wp_parse_url( $target );
+
+		// bail if scheme or host is not found in directory URL.
+		if ( ! isset( $parse_url['scheme'], $parse_url['host'], $parse_url['path'] ) ) {
+			return false;
+		}
+
+		// get the fields.
+		$fields = $webdav_object->get_fields_for_url( $credentials['fields'], $target );
+
+		// set the requested domain.
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
+
+		// create settings array for request.
+		$settings = array(
+			'baseUri'  => $domain,
+			'userName' => $fields['login']['value'],
+			'password' => $fields['password']['value'],
+		);
+
+		/**
+		 * Filter the WebDAV settings.
+		 *
+		 * @since 1.0.0 Available since 1.0.0.
+		 *
+		 * @param array<string,string> $settings The settings to use.
+		 * @param string $domain The domain to use.
+		 * @param string $directory The requested URL.
+		 */
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
+
+		// get a new client.
+		$client = $webdav_object->get_client( $settings, $domain, $directory );
+
 		// set the upload path we will use for this file.
-		$upload_path = $this->get_upload_path( $credentials['fields'], $parse_url['path'] );
+		$upload_path = $this->get_upload_path( $fields, $parse_url['path'] );
+
+		// create the folders of the target below the directory, if they do not exist (e.g., for the folder structure of exports).
+		$folders = $this->get_folders_from_target( $target, $credentials );
+		if ( ! empty( $folders ) && ! $this->create_folders( $client, $upload_path, $folders, $target ) ) {
+			return false;
+		}
+
+		// open the file, so it is uploaded as stream and not loaded completely into memory.
+		$handle = fopen( $file_path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		// bail if the file could not be opened.
+		if ( false === $handle ) {
+			// log this event.
+			Log::get_instance()->create( __( 'Given file could not be opened for the export:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $file_path ) . '</code>', $target, 'error' );
+
+			// do nothing more.
+			return false;
+		}
 
 		// upload the file to the given path.
 		try {
-			$result = $client->request( 'PUT', $upload_path, (string) $wp_filesystem_local->get_contents( $file_path ) );
+			$result = $client->request( 'PUT', $upload_path, $handle );
 		} catch ( Exception $e ) {
 			// log this event.
 			Log::get_instance()->create( __( 'Error occurred during request to export a file to WebDav:', 'external-files-from-webdav' ) . ' <code>' . $e->getMessage() . '</code>', $target, 'error' );
 
 			// do nothing more.
 			return false;
+		} finally {
+			// close the file.
+			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		}
 
 		// list of allowed status codes.
@@ -185,10 +273,10 @@ class Export extends Export_Base {
 		}
 
 		// get the fields.
-		$fields = $credentials['fields'];
+		$fields = $webdav_object->get_fields_for_url( $credentials['fields'], $directory );
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = WebDav::get_instance()->get_domain_of_url( $parse_url );
 
 		// create settings array for request.
 		$settings = array(
@@ -209,7 +297,7 @@ class Export extends Export_Base {
 		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
 
 		// set the upload path we will use for this file.
-		$upload_path = $this->get_upload_path( $credentials['fields'], $parse_url['path'] );
+		$upload_path = $this->get_upload_path( $fields, $parse_url['path'] );
 
 		// get a new client.
 		$client = $webdav_object->get_client( $settings, $domain, $directory );
@@ -247,6 +335,111 @@ class Export extends Export_Base {
 	}
 
 	/**
+	 * Return whether this service supports folders for exported files.
+	 *
+	 * @return bool
+	 */
+	public function supports_folders(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the folders of the given target below the directory of the external source.
+	 *
+	 * Returns an empty list if the target is located directly in the directory of the external source
+	 * or not located in it at all.
+	 *
+	 * @param string              $target The target path of the file.
+	 * @param array<string,mixed> $credentials The credentials of the external source.
+	 *
+	 * @return array<int,string>
+	 */
+	private function get_folders_from_target( string $target, array $credentials ): array {
+		// get the directory from the credentials.
+		$directory = isset( $credentials['directory'] ) && is_string( $credentials['directory'] ) ? trailingslashit( $credentials['directory'] ) : '';
+
+		// bail if no directory is set or the target is not located in it.
+		if ( '' === $directory || ! str_starts_with( $target, $directory ) ) {
+			return array();
+		}
+
+		// get the folders of the target below the directory.
+		$folders = array();
+		foreach ( explode( '/', dirname( substr( $target, strlen( $directory ) ) ) ) as $folder ) {
+			// bail on relative folders.
+			if ( '..' === $folder ) {
+				return array();
+			}
+
+			// skip empty folders.
+			if ( '' === $folder || '.' === $folder ) {
+				continue;
+			}
+
+			// add the folder.
+			$folders[] = $folder;
+		}
+
+		// return the list of folders.
+		return $folders;
+	}
+
+	/**
+	 * Create the given folders of the upload path on the WebDAV server, if they do not exist.
+	 *
+	 * @param Client            $client The WebDAV client.
+	 * @param string            $upload_path The path of the file to upload.
+	 * @param array<int,string> $folders The folders at the end of the upload path, which should exist.
+	 * @param string            $target The target for logging.
+	 *
+	 * @return bool
+	 */
+	private function create_folders( Client $client, string $upload_path, array $folders, string $target ): bool {
+		// get the path of the folder, which contains the folders.
+		$folder_path = dirname( $upload_path );
+		$path        = substr( $folder_path, 0, strlen( $folder_path ) - strlen( implode( '/', $folders ) ) );
+
+		// create each folder.
+		foreach ( $folders as $folder ) {
+			$path = trailingslashit( $path ) . $folder;
+
+			// create the folder.
+			try {
+				$result = $client->request( 'MKCOL', trailingslashit( $path ) );
+			} catch ( ClientHttpException $e ) {
+				// the folder does already exist.
+				if ( 405 === $e->getHttpStatus() ) {
+					continue;
+				}
+
+				// log this event.
+				Log::get_instance()->create( __( 'Error occurred during request to create a folder on WebDav:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $target, 'error' );
+
+				// do nothing more.
+				return false;
+			} catch ( Exception $e ) {
+				// log this event.
+				Log::get_instance()->create( __( 'Error occurred during request to create a folder on WebDav:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $target, 'error' );
+
+				// do nothing more.
+				return false;
+			}
+
+			// bail if the folder could not be created and does not exist (405 = folder already exists).
+			if ( ! in_array( absint( $result['statusCode'] ), array( 201, 405 ), true ) ) {
+				// log this event.
+				Log::get_instance()->create( __( 'Got unsupported status code from WebDav during creation of a folder:', 'external-files-from-webdav' ) . ' <code>' . wp_json_encode( $result ) . '</code>', $target, 'error' );
+
+				// do nothing more.
+				return false;
+			}
+		}
+
+		// return true as all folders exist.
+		return true;
+	}
+
+	/**
 	 * Return the path of a file on the WebDAV server for the given path from the URL.
 	 *
 	 * The URL of an external source is the domain (main directory) or the complete URL of a directory
@@ -269,5 +462,19 @@ class Export extends Export_Base {
 
 		// return the path with the base path.
 		return $base_path . $path;
+	}
+
+	/**
+	 * Return whether this service could save exported files privately.
+	 *
+	 * The files are saved like before. Private files are delivered via the proxy of External Files in Media Library
+	 * from its cache, which loads them with the credentials of the external source.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_private_files(): bool {
+		return true;
 	}
 }

@@ -31,6 +31,7 @@ use ExternalFilesInMediaLibrary\Services\Service;
 use ExternalFilesInMediaLibrary\Services\Service_Base;
 use Sabre\DAV\Client;
 use Error;
+use Exception;
 use WP_Error;
 use WP_User;
 
@@ -39,11 +40,72 @@ use WP_User;
  */
 class WebDav extends Service_Base implements Service {
 	/**
+	 * List of the callbacks to encrypt and decrypt settings with their context.
+	 *
+	 * @var array<string,callable>
+	 */
+	private array $crypt_callbacks = array();
+
+	/**
+	 * Return whether the user settings of this service are encrypted with a context.
+	 *
+	 * The main plugin saves the user settings with the context "usermeta:efml_<name>", if this returns true.
+	 *
+	 * @return bool
+	 */
+	public function is_crypt_context_supported(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the callback to encrypt ("save") or decrypt ("read") a setting with its context.
+	 *
+	 * Values saved without context (by older versions) stay readable. With a main plugin, which does not
+	 * support contexts, the callbacks without context are used.
+	 *
+	 * @param string $type    The type: "save" or "read".
+	 * @param string $context The context, e.g. "option:" and the name of the option.
+	 *
+	 * @return callable
+	 */
+	protected function get_crypt_callback( string $type, string $context ): callable {
+		// return the callback, if it has been created before (the same object is needed for has_filter()).
+		$key = $type . ':' . $context;
+		if ( isset( $this->crypt_callbacks[ $key ] ) ) {
+			return $this->crypt_callbacks[ $key ];
+		}
+
+		// get the crypt object.
+		$crypt_obj = Crypt::get_instance();
+
+		// create the callback.
+		if ( 'save' === $type ) {
+			$callback = method_exists( $crypt_obj, 'get_save_callback' ) ? $crypt_obj->get_save_callback( $context ) : array( $this, 'encrypt_value' );
+		} else {
+			$callback = method_exists( $crypt_obj, 'get_read_callback' ) ? $crypt_obj->get_read_callback( $context ) : array( $this, 'decrypt_value' );
+		}
+
+		// remember and return it.
+		$this->crypt_callbacks[ $key ] = $callback;
+		return $callback;
+	}
+
+	/**
 	 * The object name.
 	 *
 	 * @var string
 	 */
 	protected string $name = 'webdav';
+
+	/**
+	 * Name of the field, which contains the URL of the server.
+	 *
+	 * If the credentials are defined via constants, they are only used for this server.
+	 * Requires "External Files in Media Library" 6.0.0 or newer.
+	 *
+	 * @var string
+	 */
+	protected string $constants_host_field = 'server';
 
 	/**
 	 * The public label.
@@ -110,6 +172,20 @@ class WebDav extends Service_Base implements Service {
 		// add settings.
 		add_action( 'init', array( $this, 'init_webdav' ), 30 );
 
+		// use the protocol in each request, e.g. for private files via the proxy and for exports of uploads by users
+		// without the capability for this service. Only if the main plugin checks the capability for imports via the
+		// protocol (External Files in Media Library 6.0.0 or newer), otherwise only for users with the capability.
+		$protocol_in_each_request = method_exists( '\ExternalFilesInMediaLibrary\ExternalFiles\Protocol_Base', 'is_import_allowed_for_user' );
+		if ( $protocol_in_each_request ) {
+			add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
+		}
+
+		// use the hooks for the connection in each request, too: the proxy and exports of uploads need them.
+		add_filter( 'efmlwd_service_webdav_client', array( $this, 'ignore_self_signed_ssl' ) );
+		add_filter( 'efmlwd_service_webdav_path', array( $this, 'set_path' ), 10, 2 );
+		add_action( 'efml_export_before_on_service', array( $this, 'enable_unsafe_urls_for_export' ) );
+		add_action( 'efml_proxy_before', array( $this, 'enable_unsafe_urls_for_proxy' ) );
+
 		// bail if user has no capability for this service.
 		if ( ! defined( 'DOING_CRON' ) && ! Helper::is_cli() && ! current_user_can( 'efml_cap_' . $this->get_name() ) ) {
 			return;
@@ -118,13 +194,13 @@ class WebDav extends Service_Base implements Service {
 		// set title.
 		$this->title = __( 'Choose file(s) from your WebDAV', 'external-files-from-webdav' ); // @phpstan-ignore property.notFound
 
+		// use the protocol for users with the capability, if the main plugin does not check it for imports.
+		if ( ! $protocol_in_each_request ) {
+			add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
+		}
+
 		// use our own hooks.
-		add_filter( 'efml_protocols', array( $this, 'add_protocol' ) );
 		add_filter( 'efmlwd_service_webdav_hide_file', array( $this, 'prevent_not_allowed_files' ), 10, 3 );
-		add_filter( 'efmlwd_service_webdav_client', array( $this, 'ignore_self_signed_ssl' ) );
-		add_filter( 'efmlwd_service_webdav_path', array( $this, 'set_path' ), 10, 2 );
-		add_action( 'efml_export_before_on_service', array( $this, 'enable_unsafe_urls_for_export' ) );
-		add_action( 'efml_proxy_before', array( $this, 'enable_unsafe_urls_for_proxy' ) );
 
 		// use hooks.
 		add_action( 'show_user_profile', array( $this, 'add_user_settings' ) );
@@ -183,49 +259,61 @@ class WebDav extends Service_Base implements Service {
 
 		// add setting.
 		if ( defined( 'EFML_ACTIVATION_RUNNING' ) || 'global' === get_option( 'eml_' . $this->get_name() . '_credentials_vault' ) ) {
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_server' );
-			$setting->set_section( $section );
-			$setting->set_autoload( false );
-			$setting->set_type( 'string' );
-			$field = new Text( $settings_obj );
-			$field->set_title( __( 'WebDAV Server', 'external-files-from-webdav' ) );
-			$field->set_placeholder( __( 'https://nextcloud.local', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'server', __( 'WebDAV Server', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_server' );
+				$setting->set_section( $section );
+				$setting->set_autoload( false );
+				$setting->set_type( 'string' );
+				$field = new Text( $settings_obj );
+				$field->set_title( __( 'WebDAV Server', 'external-files-from-webdav' ) );
+				$field->set_placeholder( __( 'https://nextcloud.local', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_login' );
-			$setting->set_section( $section );
-			$setting->set_autoload( false );
-			$setting->set_type( 'string' );
-			$setting->set_read_callback( array( $this, 'decrypt_value' ) );
-			$setting->set_save_callback( array( $this, 'encrypt_value' ) );
-			$field = new Text( $settings_obj );
-			$field->set_title( __( 'Login', 'external-files-from-webdav' ) );
-			$field->set_placeholder( __( 'Your login', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'login', __( 'Login', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_login' );
+				$setting->set_section( $section );
+				$setting->set_autoload( false );
+				$setting->set_type( 'string' );
+				$setting->set_read_callback( $this->get_crypt_callback( 'read', 'option:eml_webdav_login' ) );
+				$setting->set_save_callback( $this->get_crypt_callback( 'save', 'option:eml_webdav_login' ) );
+				$field = new Text( $settings_obj );
+				$field->set_title( __( 'Login', 'external-files-from-webdav' ) );
+				$field->set_placeholder( __( 'Your login', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_password' );
-			$setting->set_section( $section );
-			$setting->set_autoload( false );
-			$setting->set_type( 'string' );
-			$setting->set_read_callback( array( $this, 'decrypt_value' ) );
-			$setting->set_save_callback( array( $this, 'encrypt_value' ) );
-			$field = new Password( $settings_obj );
-			$field->set_title( __( 'Password', 'external-files-from-webdav' ) );
-			$field->set_placeholder( __( 'Your password', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'password', __( 'Password', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_password' );
+				$setting->set_section( $section );
+				$setting->set_autoload( false );
+				$setting->set_type( 'string' );
+				$setting->set_read_callback( $this->get_crypt_callback( 'read', 'option:eml_webdav_password' ) );
+				$setting->set_save_callback( $this->get_crypt_callback( 'save', 'option:eml_webdav_password' ) );
+				$field = new Password( $settings_obj );
+				$field->set_title( __( 'Password', 'external-files-from-webdav' ) );
+				$field->set_placeholder( __( 'Your password', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 
-			// add setting.
-			$setting = $settings_obj->add_setting( 'eml_webdav_path' );
-			$setting->set_section( $section );
-			$setting->set_type( 'string' );
-			$setting->set_default( '/remote.php/dav/files/' );
-			$field = new Text( $settings_obj );
-			$field->set_title( __( 'Path', 'external-files-from-webdav' ) );
-			$field->set_description( __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ) );
-			$setting->set_field( $field );
+			// show hint if the value is defined via constant, otherwise the setting.
+			if ( ! $this->show_constant_hint( $section, 'path', __( 'Path', 'external-files-from-webdav' ) ) ) {
+				// add setting.
+				$setting = $settings_obj->add_setting( 'eml_webdav_path' );
+				$setting->set_section( $section );
+				$setting->set_type( 'string' );
+				$setting->set_default( '/remote.php/dav/files/' );
+				$field = new Text( $settings_obj );
+				$field->set_title( __( 'Path', 'external-files-from-webdav' ) );
+				$field->set_description( __( 'Define the path added after the WebDAV-domain to load files. For Nextcloud-based WebDAV this is <code>/remote.php/dav/files/</code>.', 'external-files-from-webdav' ) );
+				$setting->set_field( $field );
+			}
 		}
 
 		// show hint for user settings.
@@ -324,7 +412,7 @@ class WebDav extends Service_Base implements Service {
 		$fields = $this->get_fields();
 
 		// set the requested domain.
-		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+		$domain = $this->get_domain_of_url( $parse_url );
 
 		// create settings array for request.
 		$settings = array(
@@ -582,6 +670,11 @@ class WebDav extends Service_Base implements Service {
 
 		// get from global setting, if enabled.
 		if ( $this->is_mode( 'global' ) ) {
+			// use the path from the fields, if it is defined via constant.
+			if ( ! empty( $fields['path']['constant'] ) && ! empty( $fields['path']['value'] ) ) {
+				return $fields['path']['value'] . $fields['login']['value'] . '/';
+			}
+
 			// return path from settings.
 			return get_option( 'eml_webdav_path' ) . $fields['login']['value'] . '/';
 		}
@@ -605,7 +698,7 @@ class WebDav extends Service_Base implements Service {
 			}
 
 			// return the region from settings.
-			return Crypt::get_instance()->decrypt( $path ) . $fields['login']['value'] . '/';
+			return Crypt::get_instance()->decrypt( $path, 'usermeta:efml_webdav_path' ) . $fields['login']['value'] . '/';
 		}
 
 		// use the field setting.
@@ -618,6 +711,36 @@ class WebDav extends Service_Base implements Service {
 	}
 
 	/**
+	 * Return the domain of the given parsed URL with scheme, host and port (if set).
+	 *
+	 * The port is required for WebDAV servers, which are not reachable via the default port of their scheme
+	 * (e.g. "https://cloud.example.com:8443").
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param array<string,mixed> $parse_url The parsed URL (e.g. from "wp_parse_url()").
+	 *
+	 * @return string
+	 */
+	public function get_domain_of_url( array $parse_url ): string {
+		// bail if scheme or host are missing.
+		if ( empty( $parse_url['scheme'] ) || empty( $parse_url['host'] ) ) {
+			return '';
+		}
+
+		// create the domain with scheme and host.
+		$domain = $parse_url['scheme'] . '://' . $parse_url['host'];
+
+		// add the port, if set.
+		if ( ! empty( $parse_url['port'] ) ) {
+			$domain .= ':' . absint( $parse_url['port'] );
+		}
+
+		// return the resulting domain.
+		return $domain;
+	}
+
+	/**
 	 * Return a new sabre client object for given settings.
 	 *
 	 * @param array<string,string> $settings The settings for the client.
@@ -627,8 +750,8 @@ class WebDav extends Service_Base implements Service {
 	 * @return Client
 	 */
 	public function get_client( array $settings, string $domain, string $directory ): Client {
-		// get the file contents.
-		$client = new Client( $settings );
+		// get the client, which could also save downloads directly into files.
+		$client = new WebDav\Client( $settings );
 		$client->setThrowExceptions( true );
 
 		/**
@@ -643,6 +766,48 @@ class WebDav extends Service_Base implements Service {
 		 * @param string $directory The requested URL.
 		 */
 		return apply_filters( 'efmlwd_service_webdav_client', $client, $domain, $directory );
+	}
+
+	/**
+	 * Download the file of the base URI of the given client into the given local file.
+	 *
+	 * The file is not loaded completely into memory, if the client of this plugin is used. If the client
+	 * has been replaced via the hook "efmlwd_service_webdav_client" by another client, the file is loaded
+	 * with this client as before.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param Client $client The client to use.
+	 * @param string $file   The absolute path to the local file.
+	 *
+	 * @return void
+	 * @throws \Sabre\HTTP\ClientException If the file could not be loaded.
+	 * @throws \Sabre\HTTP\ClientHttpException If the WebDAV server returns an error.
+	 */
+	public function download_file( Client $client, string $file ): void {
+		// use the download into the file, if our client is used.
+		if ( $client instanceof WebDav\Client ) {
+			$response = $client->download_to_file( '', $file );
+
+			// bail if the WebDAV server returns an error (e.g. if exceptions are disabled via hook).
+			if ( $response->getStatus() < 200 || $response->getStatus() >= 300 ) {
+				throw new \Sabre\HTTP\ClientHttpException( $response ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+
+			// do nothing more.
+			return;
+		}
+
+		// get the file with the given client.
+		$file_data = $client->request( 'GET' );
+
+		// bail if the WebDAV server returns an error.
+		if ( absint( $file_data['statusCode'] ) < 200 || absint( $file_data['statusCode'] ) >= 300 ) {
+			throw new \Sabre\HTTP\ClientException( 'WebDAV returns the HTTP status ' . absint( $file_data['statusCode'] ) . '.' );
+		}
+
+		// save the content.
+		Helper::get_wp_filesystem()->put_contents( $file, $file_data['body'] );
 	}
 
 	/**
@@ -797,13 +962,66 @@ class WebDav extends Service_Base implements Service {
 	 * @return string
 	 */
 	public function get_directory(): string {
+		// get the fields incl. values from constants.
+		$fields = $this->get_fields();
+
 		// bail if no directory is set.
-		if ( empty( $this->fields['server']['value'] ) ) {
+		if ( empty( $fields['server']['value'] ) || ! is_string( $fields['server']['value'] ) ) {
 			return '';
 		}
 
 		// return the directory.
-		return $this->fields['server']['value'];
+		return $fields['server']['value'];
+	}
+
+	/**
+	 * Return the list of required fields, which must all be defined via constants to use any constant.
+	 *
+	 * The path is optional, as it has a default value.
+	 *
+	 * @return array<int,string>
+	 */
+	public function get_required_fields_for_constants(): array {
+		return array_values( array_diff( parent::get_required_fields_for_constants(), array( 'path' ) ) );
+	}
+
+	/**
+	 * Return the fields of a saved external source incl. the values of constants for the given URL.
+	 *
+	 * The values of constants are only used for the server defined via constants.
+	 *
+	 * @param array<string,mixed> $fields The fields.
+	 * @param string              $url    The URL.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function get_fields_for_url( array $fields, string $url ): array {
+		// bail if the main plugin does not support constants (requires "External Files in Media Library" 6.0.0 or newer).
+		if ( ! method_exists( $this, 'apply_constants_to_fields' ) ) { // @phpstan-ignore function.alreadyNarrowedType
+			return $fields;
+		}
+
+		// return the fields incl. the values of constants.
+		return $this->apply_constants_to_fields( $fields, $url );
+	}
+
+	/**
+	 * Show a non-editable hint instead of a setting, if the value of the given field is defined via constant.
+	 *
+	 * @param Section $section    The section for the setting.
+	 * @param string  $field_name The name of the field.
+	 * @param string  $title      The title of the setting.
+	 *
+	 * @return bool True if the hint has been added, false if the setting should be added.
+	 */
+	protected function show_constant_hint( Section $section, string $field_name, string $title ): bool {
+		// bail if the main plugin does not support this (requires "External Files in Media Library" 6.0.0 or newer).
+		if ( ! method_exists( $this, 'add_constant_hint_setting' ) ) { // @phpstan-ignore function.alreadyNarrowedType
+			return false;
+		}
+
+		// add the hint, if the value is defined via constant.
+		return $this->add_constant_hint_setting( $section, $field_name, $title );
 	}
 
 	/**
@@ -880,8 +1098,8 @@ class WebDav extends Service_Base implements Service {
 		// get it global, if this is enabled.
 		if ( $this->is_mode( 'global' ) ) {
 			$values['server']   = get_option( 'eml_webdav_server', '' );
-			$values['login']    = Crypt::get_instance()->decrypt( get_option( 'eml_webdav_login', '' ) );
-			$values['password'] = Crypt::get_instance()->decrypt( get_option( 'eml_webdav_password', '' ) );
+			$values['login']    = Crypt::get_instance()->decrypt( (string) get_option( 'eml_webdav_login', '' ), 'option:eml_webdav_login' );
+			$values['password'] = Crypt::get_instance()->decrypt( (string) get_option( 'eml_webdav_password', '' ), 'option:eml_webdav_password' );
 			$values['path']     = get_option( 'eml_webdav_path', '' );
 		}
 
@@ -896,10 +1114,10 @@ class WebDav extends Service_Base implements Service {
 			}
 
 			// get the values.
-			$values['server']   = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_server', true ) );
-			$values['login']    = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_login', true ) );
-			$values['password'] = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_password', true ) );
-			$values['path']     = Crypt::get_instance()->decrypt( get_user_meta( $user->ID, 'efml_webdav_path', true ) );
+			$values['server']   = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_server', true ), 'usermeta:efml_webdav_server' );
+			$values['login']    = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_login', true ), 'usermeta:efml_webdav_login' );
+			$values['password'] = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_password', true ), 'usermeta:efml_webdav_password' );
+			$values['path']     = Crypt::get_instance()->decrypt( (string) get_user_meta( $user->ID, 'efml_webdav_path', true ), 'usermeta:efml_webdav_path' );
 		}
 
 		// return the resulting list of values.
@@ -997,5 +1215,191 @@ class WebDav extends Service_Base implements Service {
 
 		// set filter to enabled unsafe URL.
 		add_filter( 'http_request_args', array( $this, 'disable_check_for_unsafe_urls' ), 10, 2 );
+	}
+
+	/**
+	 * Return whether this service supports the complete connection test (requires External Files in Media Library 6.0.0).
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_connection_test(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the client and the URL of the directory for the connection test.
+	 *
+	 * The directory is the actual directory of the listing or the main directory of the connection, the same
+	 * way the directory listing determines it.
+	 *
+	 * @return array{client: Client, url: string}
+	 * @throws Exception If the URL could not be used.
+	 */
+	private function get_connection_test_client(): array {
+		// get the directory.
+		$directory = $this->get_connection_test_directory();
+		if ( ! str_starts_with( $directory, 'http://' ) && ! str_starts_with( $directory, 'https://' ) ) {
+			$directory = $this->get_directory();
+		}
+
+		// get the parts of the URL.
+		$parse_url = wp_parse_url( $directory );
+
+		// bail if scheme or host is not found.
+		if ( ! is_array( $parse_url ) || ! isset( $parse_url['scheme'], $parse_url['host'] ) ) {
+			throw new Exception( esc_html__( 'No credentials set for this WebDAV connection!', 'external-files-from-webdav' ) );
+		}
+
+		// get the fields and the domain.
+		$fields = $this->get_fields();
+		$domain = $this->get_domain_of_url( $parse_url );
+
+		// get the path like the directory listing does it.
+		$path = isset( $parse_url['path'] ) && '/' !== $parse_url['path'] ? $parse_url['path'] : '';
+
+		/** This filter is documented in app/WebDav.php */
+		$path = apply_filters( 'efmlwd_service_webdav_path', $path, $fields, $domain, $directory );
+
+		// create the settings for the client with the directory as base.
+		$url      = $domain . '/' . trim( $path, '/' ) . ( '' !== trim( $path, '/' ) ? '/' : '' );
+		$settings = array(
+			'baseUri'  => $url,
+			'userName' => $fields['login']['value'],
+			'password' => $fields['password']['value'],
+		);
+
+		/** This filter is documented in app/WebDav.php */
+		$settings = apply_filters( 'efmlwd_service_webdav_settings', $settings, $domain, $directory );
+
+		// return the client and the URL.
+		return array(
+			'client' => $this->get_client( $settings, $domain, $directory ),
+			'url'    => $url,
+		);
+	}
+
+	/**
+	 * Connect to WebDAV and list the directory for the connection test.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @return string
+	 * @throws Exception If the step failed.
+	 */
+	protected function test_connection_list(): string {
+		// get the client.
+		$connection = $this->get_connection_test_client();
+
+		// list the directory.
+		try {
+			$connection['client']->propFind( '', array( '{DAV:}resourcetype' ), 1 );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			Log::get_instance()->create( __( 'The directory could not be read on WebDAV. Error:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $connection['url'], 'error' );
+			throw new Exception( esc_html__( 'The directory could not be read on WebDAV. Check the server, the path and the credentials.', 'external-files-from-webdav' ) );
+		}
+
+		// return the message.
+		return __( 'The directory could be read.', 'external-files-from-webdav' );
+	}
+
+	/**
+	 * Upload the test file to WebDAV.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param string $local_file The absolute path to the local test file.
+	 * @param string $file_name  The name of the test file.
+	 *
+	 * @return string
+	 * @throws Exception If the step failed.
+	 */
+	protected function test_connection_upload( string $local_file, string $file_name ): string {
+		// get the client.
+		$connection = $this->get_connection_test_client();
+
+		// upload the file.
+		try {
+			$result = $connection['client']->request( 'PUT', rawurlencode( $file_name ), (string) Helper::get_wp_filesystem()->get_contents( $local_file ) );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			Log::get_instance()->create( __( 'The test file could not be uploaded to WebDAV. Error:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $connection['url'], 'error' );
+			throw new Exception( esc_html__( 'The test file could not be uploaded to WebDAV. Check the permissions of the directory.', 'external-files-from-webdav' ) );
+		}
+
+		// bail if the WebDAV server returns an unexpected status.
+		if ( absint( $result['statusCode'] ) < 200 || absint( $result['statusCode'] ) >= 300 ) {
+			/* translators: %1$d will be replaced by an HTTP status like 403. */
+			throw new Exception( esc_html( sprintf( __( 'The test file could not be uploaded to WebDAV. The server returns with HTTP status %1$d.', 'external-files-from-webdav' ), absint( $result['statusCode'] ) ) ) );
+		}
+
+		// return the URL of the file.
+		return $connection['url'] . rawurlencode( $file_name );
+	}
+
+	/**
+	 * Delete the test file on WebDAV.
+	 *
+	 * @since 1.2.0 Available since 1.2.0.
+	 *
+	 * @param string $url       The URL of the uploaded file.
+	 * @param string $file_name The name of the test file.
+	 *
+	 * @return void
+	 * @throws Exception If the step failed.
+	 */
+	protected function test_connection_delete( string $url, string $file_name ): void {
+		// get the client.
+		$connection = $this->get_connection_test_client();
+
+		// delete the file.
+		try {
+			$result = $connection['client']->request( 'DELETE', rawurlencode( $file_name ) );
+		} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+			Log::get_instance()->create( __( 'The test file could not be deleted on WebDAV. Error:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $connection['url'], 'error' );
+			throw new Exception( esc_html__( 'The test file could not be deleted on WebDAV.', 'external-files-from-webdav' ) );
+		}
+
+		// bail if the WebDAV server returns an unexpected status.
+		if ( absint( $result['statusCode'] ) < 200 || absint( $result['statusCode'] ) >= 300 ) {
+			throw new Exception( esc_html__( 'The test file could not be deleted on WebDAV.', 'external-files-from-webdav' ) );
+		}
+	}
+
+	/**
+	 * Return further search terms of this service, separated by commas (e.g. for the command palette).
+	 *
+	 * Requires "External Files in Media Library" 6.0.0 or newer.
+	 *
+	 * @return string
+	 */
+	protected function get_keywords(): string {
+		return 'WebDAV, Nextcloud, ownCloud, Seafile, DAV, cloud';
+	}
+
+	/**
+	 * Return the help for the setup of this service.
+	 *
+	 * @return array{intro?: string, steps?: array<int,string>, hints?: array<int,string>, code?: array{label: string, content: string, hint?: string}, links?: array<int,array{label: string, url: string}>}
+	 */
+	public function get_setup_guide(): array {
+		return array(
+			'intro' => __( 'Many storages and cloud services offer access via WebDAV, e.g. Nextcloud, ownCloud or NAS systems. You get the address, the login and the password from the provider of the storage or its administrator.', 'external-files-from-webdav' ),
+			'steps' => array(
+				__( 'Enter the address of the server, e.g. <code>https://cloud.example.com</code>.', 'external-files-from-webdav' ),
+				__( 'Enter login and password. If your storage offers app passwords (e.g. Nextcloud under Personal settings → Security), use an own app password for this website.', 'external-files-from-webdav' ),
+				__( 'Enter the path of the WebDAV interface. Your login is added to it automatically. The default <code>/remote.php/dav/files/</code> fits e.g. Nextcloud, other storages use other paths.', 'external-files-from-webdav' ),
+			),
+			'hints' => array(
+				__( 'If two-factor authentication is enabled for your account, the login only works with an app password.', 'external-files-from-webdav' ),
+				__( 'The plugin only connects via HTTPS.', 'external-files-from-webdav' ),
+			),
+			'links' => array(
+				array(
+					'label' => __( 'Example: WebDAV with Nextcloud', 'external-files-from-webdav' ),
+					'url'   => 'https://docs.nextcloud.com/server/stable/user_manual/en/files/access_webdav.html',
+				),
+			),
+		);
 	}
 }
