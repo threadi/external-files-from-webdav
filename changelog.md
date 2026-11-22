@@ -1,35 +1,32 @@
 # Changelog
 
-## [Unreleased]
+## [2.0.0] - 22.11.2026
 
 ### Added
 
-- Added export of the sizes of images and their original image together with them (requires External Files in Media Library 6.0.0): they are delivered via the proxy like the images themselves
-- Added help "Where do I find these details?" to the form and to the quickstart (requires External Files in Media Library 6.0.0): where to get the address and the access data, with Nextcloud as example
-- Added possibility to define the credentials via constants, e.g. in wp-config.php (requires External Files in Media Library 6.0.0)
-- Credentials from constants are only used for the server defined via constant, saved external sources on other servers are not usable then
-- Added possibility to define several connections via constants, e.g. for two servers (requires External Files in Media Library 6.0.0)
-- Added documentation for the constants in docs/constants.md
-- Added support for the folder structure of exported files, missing folders are created (requires External Files in Media Library 6.0.0)
-- Added support for private files (requires External Files in Media Library 6.0.0): files are delivered via the cache of the proxy, which loads them with the credentials of the external source
-- Added support for the connection test in the directory listing (requires External Files in Media Library 6.0.0)
-- Added integration tests against a real WebDAV server of Sabre and a GitHub workflow for them
-- Directories are imported file by file via the import of External Files in Media Library 6.0.0: also directories with tens of thousands of files, in the background if necessary
-- Added integration test for the import of a directory with 1,100 files
-- Added search terms for the command palette of WordPress, e.g. other names of the service (requires External Files in Media Library 6.0.0)
+- Added support for the new features of External Files in Media Library 6.0.0 (required for the following):
+- Added export of image sizes and original images
+- Added setup help "Where do I find these details?" for the form and the quickstart
+- Added credentials via constants, also for several connections
+- Added folder structure for exported files
+- Added private files
+- Added connection test in the directory listing
+- Added import of large directories file by file, also in the background
+- Added search terms for the command palette
+- Added integration tests with a real WebDAV server
 
 ### Changed
 
-- Encrypted settings and access data are bound to their purpose (requires External Files in Media Library 6.0.0): an encrypted value copied into another field cannot be decrypted there; values saved by older versions stay readable and are bound to their purpose when they are saved again
+- Encrypted values are bound to their purpose
 - Updated German translations
 
 ### Fixed
 
-- Fixed delivery of private files via the proxy for visitors and users without the capability for WebDAV, and exports of uploads by such users (requires External Files in Media Library 6.0.0): the protocol is known in each request now, imports still require the capability for WebDAV
-- Fixed high memory usage during the export of large files, they are now uploaded as stream (for this the credentials are sent directly via Basic auth for HTTPS connections, otherwise or if the server requires another authentication method, files are loaded into memory as before)
-- Fixed high memory usage during the import of large files and their loading into the cache of the proxy, they are now saved directly into a local file
-- The cache of the proxy now loads files via the WebDAV client, so the settings via the hook "efmlwd_service_webdav_client" and the authentication methods of WebDAV (e.g. Digest) are used for it too
-- Fixed WebDAV servers with a port in their URL (e.g. https://cloud.example.com:8443), the port was ignored for all requests
+- Fixed directory listing with credentials via constants without path
+- Fixed delivery of private files to visitors and users without WebDAV capability
+- Fixed high memory usage with large files during export, import and proxy caching
+- Fixed proxy cache not using the WebDAV client and its authentication methods
+- Fixed ports in the URL of WebDAV servers being ignored
 
 ## [1.1.0] - 24.10.2026
 

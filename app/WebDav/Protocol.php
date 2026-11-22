@@ -45,7 +45,7 @@ class Protocol extends Protocol_Base {
 	public function is_import_allowed_for_user(): bool {
 		// use the check of the service, if it is available (External Files in Media Library 6.0.0 or newer).
 		$service_obj = WebDav::get_instance();
-		if ( method_exists( $service_obj, 'is_import_permitted' ) ) {
+		if ( method_exists( $service_obj, 'is_import_permitted' ) ) { // @phpstan-ignore function.alreadyNarrowedType
 			return $service_obj->is_import_permitted();
 		}
 
