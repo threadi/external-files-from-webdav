@@ -205,6 +205,132 @@ class Protocol extends Protocol_Base {
 	}
 
 	/**
+	 * Return whether this protocol could use the files of subdirectories during a synchronization.
+	 *
+	 * @since 2.1.0 Available since 2.1.0.
+	 *
+	 * @return bool
+	 */
+	public function supports_subdirectories(): bool {
+		return true;
+	}
+
+	/**
+	 * Return the path of the directory of the given file URL relative to the directory of the URL of this object.
+	 *
+	 * The URLs of WebDAV are encoded, the returned path contains the names of the directories.
+	 *
+	 * @since 2.1.0 Available since 2.1.0.
+	 *
+	 * @param string $file_url The URL of the file.
+	 *
+	 * @return string
+	 */
+	public function get_relative_directory( string $file_url ): string {
+		return rawurldecode( parent::get_relative_directory( rawurldecode( $file_url ) ) );
+	}
+
+	/**
+	 * Return the given URL in the form, which is used to compare the URLs of files with the URL of this object.
+	 *
+	 * @param string $url The URL.
+	 *
+	 * @return string
+	 */
+	protected function normalize_url_for_relative_directory( string $url ): string {
+		return rawurldecode( $url );
+	}
+
+	/**
+	 * Return whether the files of subdirectories should be used.
+	 *
+	 * Older versions of "External Files in Media Library" do not know this setting: only the files of the directory
+	 * itself are used then like before.
+	 *
+	 * @return bool
+	 */
+	private function use_subdirectories(): bool {
+		// bail if the main plugin does not support the setting.
+		if ( ! method_exists( $this, 'is_subdirectories_enabled' ) ) { // @phpstan-ignore function.alreadyNarrowedType
+			return false;
+		}
+
+		// return the setting.
+		return $this->is_subdirectories_enabled();
+	}
+
+	/**
+	 * Return the entries of the subdirectories in the given list of a directory, also of their subdirectories.
+	 *
+	 * The entries have the path of the server as key (like the list of propFind()). Subdirectories, which are in the
+	 * list of excluded directories or deeper than the maximum depth, are not used. Subdirectories, which could not be
+	 * read, are skipped.
+	 *
+	 * @param array<string,array<string,mixed>> $directory_list The entries of the directory.
+	 * @param string                            $path           The path of the directory on the server.
+	 * @param array<string,mixed>               $request_data   The data for the requests.
+	 * @param int                               $depth          The depth of the subdirectories in the list.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function get_entries_of_subdirectories( array $directory_list, string $path, array $request_data, int $depth ): array {
+		// bail if the maximum depth is reached.
+		if ( $depth > $this->get_subdirectories_max_depth() ) {
+			return array();
+		}
+
+		// get the excluded directories.
+		$excluded = $this->get_excluded_directories();
+
+		// collect the entries.
+		$entries = array();
+		foreach ( $directory_list as $href => $setting ) {
+			$href = (string) $href;
+
+			// bail if this is a file.
+			if ( is_null( $setting['{DAV:}resourcetype'] ?? null ) ) {
+				continue;
+			}
+
+			// bail if this is the directory itself.
+			if ( rawurldecode( untrailingslashit( $href ) ) === rawurldecode( untrailingslashit( $path ) ) ) {
+				continue;
+			}
+
+			// bail if this directory is excluded.
+			if ( in_array( rawurldecode( basename( untrailingslashit( $href ) ) ), $excluded, true ) ) {
+				continue;
+			}
+
+			// get the URL of the subdirectory.
+			$url = $request_data['domain'] . trailingslashit( $href );
+
+			// get the entries of the subdirectory.
+			try {
+				$settings            = $request_data['settings'];
+				$settings['baseUri'] = $url;
+				$client              = WebDav::get_instance()->get_client( $settings, $request_data['domain'], $this->get_url() );
+				$sub_list            = $client->propFind( '', array( '{DAV:}resourcetype', '{DAV:}getcontentlength', '{DAV:}getlastmodified' ), 1 );
+			} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
+				// skip the subdirectory, so its files are not deleted during a synchronization.
+				$this->skip_subdirectory( $url );
+				continue;
+			}
+
+			// add its files and the files of its subdirectories.
+			foreach ( $sub_list as $sub_href => $sub_setting ) {
+				if ( is_null( $sub_setting['{DAV:}resourcetype'] ?? null ) ) {
+					$entries[ (string) $sub_href ] = $sub_setting;
+				}
+			}
+			$entries += $this->get_entries_of_subdirectories( $sub_list, trailingslashit( $href ), $request_data, $depth + 1 );
+		}
+
+		// return the entries.
+		return $entries;
+	}
+
+	/**
 	 * Return whether the URL of this object is a directory (a URL with a trailing slash).
 	 *
 	 * Directories without trailing slash are still imported with all files in one request.
@@ -222,8 +348,9 @@ class Protocol extends Protocol_Base {
 	/**
 	 * Return one page of the files in the directory of the URL of this object.
 	 *
-	 * Like the import of a directory, only the files directly in the directory are used. WebDAV returns the
-	 * complete list of a directory with one request, which is loaded only once per request.
+	 * Like the import of a directory, only the files directly in the directory are used, during a synchronization
+	 * also the files of the subdirectories, if this is enabled. WebDAV returns the complete list of a directory with
+	 * one request, which is loaded only once per request.
 	 *
 	 * @param string $cursor The cursor for the requested page.
 	 *
@@ -248,6 +375,11 @@ class Protocol extends Protocol_Base {
 				} catch ( \Sabre\HTTP\ClientHttpException | \Sabre\HTTP\ClientException | Error $e ) {
 					Log::get_instance()->create( __( 'The following error occurred:', 'external-files-from-webdav' ) . ' <code>' . esc_html( $e->getMessage() ) . '</code>', $this->get_url(), 'error', 0, Import::get_instance()->get_identifier() );
 					return false;
+				}
+
+				// add the files of the subdirectories, if they should be used.
+				if ( $this->use_subdirectories() ) {
+					$directory_list += $this->get_entries_of_subdirectories( $directory_list, (string) $request_data['path'], $request_data, 1 );
 				}
 
 				// collect the files.
@@ -343,6 +475,11 @@ class Protocol extends Protocol_Base {
 
 			// do nothing more.
 			return array();
+		}
+
+		// add the files of the subdirectories, if they should be used.
+		if ( $this->use_subdirectories() ) {
+			$directory_list += $this->get_entries_of_subdirectories( $directory_list, $path, $request_data, 1 );
 		}
 
 		// collect the files.

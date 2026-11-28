@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0] - tbd
+
+### Added
+
+- Added the directories of files relative to their external source, for the folder structure in folder plugins of External Files in Media Library 6.1.0
+- Added support for the option to synchronize subdirectories of External Files in Media Library 6.1.0: directories could be synchronized with their subdirectories (up to a depth of 10, without directories like ".git" or "node_modules")
+- Added skipping of subdirectories, which could not be read: their files are not deleted after the synchronization
+
 ## [2.0.0] - 22.11.2026
 
 ### Added

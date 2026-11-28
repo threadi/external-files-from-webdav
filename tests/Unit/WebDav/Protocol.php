@@ -441,4 +441,140 @@ class Protocol extends externalFilesFromWebDavTests {
 		$this->assertEquals( $url, $results[0]['url'] );
 		$this->assertEquals( $this->get_file_content(), file_get_contents( $results[0]['tmp-file'] ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 	}
+
+	/**
+	 * Add the responses for a directory with subdirectories.
+	 *
+	 * "Holidays" contains a file and the deeper directory "2024" with a file. "Private" could not be read,
+	 * "node_modules" is excluded.
+	 *
+	 * @param string $url The URL of the directory.
+	 *
+	 * @return void
+	 */
+	private function add_directory_with_subdirectories( string $url ): void {
+		$base = '/remote.php/dav/files/user/Photos/';
+		$this->add_webdav_response(
+			'PROPFIND',
+			$url,
+			207,
+			$this->get_propfind_body(
+				array(
+					$base                  => array( 'dir' => true ),
+					$base . 'a.jpg'        => array( 'size' => 706, 'type' => 'image/jpeg' ),
+					$base . 'Holidays/'    => array( 'dir' => true ),
+					$base . 'Private/'     => array( 'dir' => true ),
+					$base . 'node_modules/' => array( 'dir' => true ),
+				)
+			)
+		);
+		$this->add_webdav_response(
+			'PROPFIND',
+			$url . 'Holidays/',
+			207,
+			$this->get_propfind_body(
+				array(
+					$base . 'Holidays/'       => array( 'dir' => true ),
+					$base . 'Holidays/c.jpg'  => array( 'size' => 706, 'type' => 'image/jpeg' ),
+					$base . 'Holidays/2024/'  => array( 'dir' => true ),
+				)
+			)
+		);
+		$this->add_webdav_response(
+			'PROPFIND',
+			$url . 'Holidays/2024/',
+			207,
+			$this->get_propfind_body(
+				array(
+					$base . 'Holidays/2024/'      => array( 'dir' => true ),
+					$base . 'Holidays/2024/d.jpg' => array( 'size' => 706, 'type' => 'image/jpeg' ),
+				)
+			)
+		);
+		$this->add_webdav_response( 'PROPFIND', $url . 'Private/', 403 );
+	}
+
+	/**
+	 * Test the file list with and without the files of subdirectories.
+	 *
+	 * By default, only the files of the directory are used (like before). If subdirectories should be used (e.g. for
+	 * the synchronization of an external source), the files of all readable subdirectories are used.
+	 *
+	 * @return void
+	 */
+	public function test_get_file_list_with_subdirectories(): void {
+		$url = $this->domain . '/remote.php/dav/files/user/Photos/';
+		$this->add_directory_with_subdirectories( $url );
+		$protocol = $this->get_protocol( $url );
+		$this->assertTrue( $protocol->supports_subdirectories() );
+		$this->assertFalse( $protocol->get_subdirectories_default() );
+
+		// by default, only the file of the directory is used.
+		$page = $protocol->get_file_list( '' );
+		$this->assertIsArray( $page );
+		$this->assertEquals( array( $url . 'a.jpg' ), array_column( $page['files'], 'url' ) );
+		$this->assertCount( 1, $this->get_webdav_requests() );
+
+		// with subdirectories, also their files are used; the unreadable directory is skipped and reported.
+		$skipped  = array();
+		$callback = static function ( string $directory ) use ( &$skipped ): void {
+			$skipped[] = $directory;
+		};
+		add_action( 'efml_subdirectory_skipped', $callback );
+		add_filter( 'efml_include_subdirectories', '__return_true' );
+		$page = $protocol->get_file_list( '' );
+		remove_filter( 'efml_include_subdirectories', '__return_true' );
+		remove_action( 'efml_subdirectory_skipped', $callback );
+		$this->assertIsArray( $page );
+		$this->assertEquals( array( $url . 'a.jpg', $url . 'Holidays/c.jpg', $url . 'Holidays/2024/d.jpg' ), array_column( $page['files'], 'url' ) );
+		$this->assertEquals( array( $url . 'Private/' ), $skipped );
+
+		// the directories of the files relative to the external source are known (e.g. for folder plugins).
+		$this->assertEquals( array( '', 'Holidays', 'Holidays/2024' ), array_map( array( $protocol, 'get_relative_directory' ), array_column( $page['files'], 'url' ) ) );
+		$this->assertEquals( 'My Photos', $protocol->get_relative_directory( $url . 'My%20Photos/e.jpg' ) );
+
+		// the excluded directory has not been requested.
+		$this->assertNotContains( $url . 'node_modules/', array_column( $this->get_webdav_requests(), 'url' ) );
+	}
+
+	/**
+	 * Test the maximum depth of subdirectories.
+	 *
+	 * @return void
+	 */
+	public function test_get_file_list_with_maximum_depth(): void {
+		$url = $this->domain . '/remote.php/dav/files/user/Photos/';
+		$this->add_directory_with_subdirectories( $url );
+
+		add_filter( 'efml_include_subdirectories', '__return_true' );
+		add_filter( 'efml_subdirectories_max_depth', static fn() => 1 );
+		$page = $this->get_protocol( $url )->get_file_list( '' );
+		remove_filter( 'efml_include_subdirectories', '__return_true' );
+
+		$this->assertIsArray( $page );
+		$this->assertEquals( array( $url . 'a.jpg', $url . 'Holidays/c.jpg' ), array_column( $page['files'], 'url' ) );
+		$this->assertNotContains( $url . 'Holidays/2024/', array_column( $this->get_webdav_requests(), 'url' ) );
+	}
+
+	/**
+	 * Test the import of a directory with the files of subdirectories (without import run).
+	 *
+	 * @return void
+	 */
+	public function test_get_url_infos_for_directory_with_subdirectories(): void {
+		$url = $this->domain . '/remote.php/dav/files/user/Photos/';
+		$this->add_directory_with_subdirectories( $url );
+		foreach ( array( 'a.jpg', 'Holidays/c.jpg', 'Holidays/2024/d.jpg' ) as $file ) {
+			$this->add_webdav_response( 'GET', $url . $file, 200, $this->get_file_content() );
+		}
+
+		add_filter( 'efml_include_subdirectories', '__return_true' );
+		$results = $this->get_protocol( $url )->get_url_infos();
+		remove_filter( 'efml_include_subdirectories', '__return_true' );
+
+		$this->assertEquals( array( $url . 'a.jpg', $url . 'Holidays/c.jpg', $url . 'Holidays/2024/d.jpg' ), array_column( $results, 'url' ) );
+		foreach ( $results as $file ) {
+			$this->tmp_files[] = $file['tmp-file'];
+		}
+	}
 }
